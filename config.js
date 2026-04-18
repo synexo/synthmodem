@@ -142,11 +142,23 @@ module.exports = {
     // Internal processing block size in samples
     blockSizeSamples: 160,
 
-    // AGC (Automatic Gain Control) — normalise incoming signal level
-    agcEnabled: true,
-    agcTargetLevel: 0.5,   // target RMS (0.0–1.0)
-    agcAttackAlpha: 0.01,  // fast attack
-    agcDecayAlpha: 0.001,  // slow decay
+    // AGC (Automatic Gain Control) — normalise incoming signal level.
+    // DISABLED BY DEFAULT. QAM signals (V.22bis, V.32bis, V.34) have
+    // non-constant envelope: outer 16-QAM points are 3x the inner-point
+    // amplitude, which is information the slicer needs. Classic
+    // envelope-tracking AGCs will "smooth out" this amplitude structure
+    // and break decoding. The rewritten AGC in Primitives.js uses slow
+    // block-RMS measurement and is safe to enable if your SIP gateway
+    // produces significantly varying signal levels — but tune
+    // agcTargetLevel to match your real signal's RMS, otherwise the
+    // slicer's fixed thresholds won't align with the scaled signal.
+    agcEnabled: false,
+    agcTargetLevel: 0.28,   // Matches natural RMS of V.22bis QAM TX at AMP=0.4.
+                            // If AGC is enabled and input matches this level,
+                            // gain converges to 1 (no-op). For real channels
+                            // with level variation, set to your expected RMS.
+    agcAttackAlpha: 0.01,
+    agcDecayAlpha: 0.001,
 
     // Carrier frequency offsets (Hz) — tolerance for slightly mis-tuned carriers
     carrierToleranceHz: 10,

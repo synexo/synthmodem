@@ -129,31 +129,62 @@ class BiquadFilter {
 
 // ─── AGC (Automatic Gain Control) ─────────────────────────────────────────────
 
+/**
+ * Automatic Gain Control for modem RX audio.
+ *
+ * QAM signals have non-constant envelope — outer 16-QAM constellation
+ * points are 3× the inner-points' amplitude, which is information, not
+ * channel fade. A naive per-sample AGC that tracks |x| would "correct"
+ * this amplitude structure and destroy the slicer's ability to decode.
+ *
+ * This AGC measures block RMS over ~120ms (960 samples @ 8kHz, ~72 symbols
+ * at V.22bis 600 baud) — much longer than any one symbol — and updates
+ * gain by ~1% per block. That tracks real channel-level drift without
+ * disturbing symbol-to-symbol amplitude information.
+ *
+ * agcTargetLevel should match the natural RMS of your expected signal.
+ * For loopback (local-generated G.711) this is about 0.28 for the default
+ * AMP=0.4 QAM TX level (theoretical: AMP × √0.5 = 0.283). If the target
+ * matches the input RMS, AGC converges to gain=1 and is effectively a
+ * pass-through — useful behaviour in loopback while still being able to
+ * correct real-channel level drift when enabled.
+ *
+ * Disabled by default in config.modem.agcEnabled; ModemDSP skips calling
+ * AGC.process() entirely when it's disabled.
+ */
 class AGC {
   constructor(cfg) {
-    this._target  = cfg.agcTargetLevel;
-    this._attack  = cfg.agcAttackAlpha;
-    this._decay   = cfg.agcDecayAlpha;
-    this._gain    = 1.0;
-    this._rmsEst  = 0.0;
+    this._target    = cfg.agcTargetLevel;
+    this._gain      = 1.0;
+    this._sqSum     = 0;
+    this._count     = 0;
+    this._blockSize = 960;   // ~120ms @ 8kHz
+    this._stepSize  = 0.01;  // 1% gain adjustment per block
   }
 
   process(samples) {
     const out = new Float32Array(samples.length);
     for (let i = 0; i < samples.length; i++) {
-      const x    = samples[i] * this._gain;
-      const xabs = Math.abs(x);
-      const alpha = xabs > this._rmsEst ? this._attack : this._decay;
-      this._rmsEst += alpha * (xabs - this._rmsEst);
-      if (this._rmsEst > 1e-6) {
-        const err = this._target - this._rmsEst;
-        this._gain *= (1 + 0.1 * err);
-        this._gain = Math.max(0.01, Math.min(100, this._gain));
+      const y = samples[i] * this._gain;
+      out[i] = y < -1 ? -1 : (y > 1 ? 1 : y);
+      // Measure RMS of INPUT to estimate natural channel level
+      this._sqSum += samples[i] * samples[i];
+      if (++this._count >= this._blockSize) {
+        const rms = Math.sqrt(this._sqSum / this._count);
+        if (rms > 1e-5) {
+          const desired = this._target / rms;
+          // Geometric step toward target gain
+          this._gain *= 1 + (desired / this._gain - 1) * this._stepSize;
+          this._gain = Math.max(0.1, Math.min(10, this._gain));
+        }
+        this._sqSum = 0;
+        this._count = 0;
       }
-      out[i] = Math.max(-1, Math.min(1, x));
     }
     return out;
   }
+
+  get gain() { return this._gain; }
 }
 
 // ─── Costas Loop (carrier phase/frequency recovery) ──────────────────────────
