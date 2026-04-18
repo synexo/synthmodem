@@ -1,0 +1,18 @@
+{
+  "name": "synthmodem",
+  "version": "1.0.0",
+  "description": "Modem-to-Telnet gateway over SIP — V.21 through V.34, G.711 RTP",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "client": "node test-client/index.js",
+    "test": "node test-client/index.js --auto"
+  },
+  "dependencies": {
+    "speaker": "^0.5.5"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "license": "MIT"
+}
