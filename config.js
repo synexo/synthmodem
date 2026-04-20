@@ -7,19 +7,20 @@
 
 module.exports = {
 
+
   // ─────────────────────────────────────────────────────────────────────────────
   // SIP SERVER
   // ─────────────────────────────────────────────────────────────────────────────
   sip: {
     // Interface to bind. '0.0.0.0' listens on all interfaces.
-    host: '0.0.0.0',
+    host: '192.168.1.148',
 
     // UDP and TCP SIP port (standard is 5060)
     port: 5060,
 
     // The hostname/IP advertised in Via, Contact, and SDP headers.
     // Set this to the externally reachable IP if behind NAT.
-    publicHost: '127.0.0.1',
+    publicHost: '192.168.1.148',
 
     // Domain used in From/To headers for generated responses
     domain: 'synthmodem.local',
@@ -85,6 +86,8 @@ module.exports = {
     // Role: 'answer' (SynthModem acts as the answering modem, normal for a server)
     //       'originate' (SynthModem initiates - used by test client)
     role: 'answer',
+    captureAudio: true,        // Write WAV per call for debugging
+    captureDir: './captures',  // Output directory
 
     // Protocol negotiation order (highest preferred first).
     // SynthModem will try these in order during V.8 handshake.
@@ -119,13 +122,17 @@ module.exports = {
     enableV8: true,
 
     // V.8 menu: list of modulation modes to advertise (subset of protocolPreference)
-    v8ModulationModes: ['V34', 'V32bis', 'V22bis', 'V22', 'V21'],
+    // Currently only V.22bis, V.22, and V.21 are fully implemented on the
+    // answer side. Advertising V.34 or V.32bis here would cause a 56k
+    // modem to try training those with us, which would fail. Advertising
+    // only what we actually support forces the modem to downshift.
+    v8ModulationModes: ['V22bis', 'V22', 'V21'],
 
     // Timeout waiting for CI (Call Indicator) from originating modem (ms)
     v8CiTimeoutMs: 200,
 
-    // Timeout for entire V.8 handshake before falling back (ms)
-    v8HandshakeTimeoutMs: 5000,
+    // (v8HandshakeTimeoutMs removed — Handshake.js hardcodes 15000 ms
+    // since real modems need 5-12s after ANSam ends to complete CM.)
 
     // ── Training & synchronisation ──
     // Duration of training sequence (ms) — varies per protocol, these are minimums
@@ -216,11 +223,8 @@ module.exports = {
         backwardSpace: 450,
       },
       V32bis: {
-        // Role-differentiated carriers to prevent collision in full-duplex loopback.
-        // Answer modem uses 1800 Hz (ITU V.32bis standard).
-        // Originating modem uses 1200 Hz (analogous to V.22 split).
-        answerCarrier:   1800,
-        originateCarrier: 1200,
+        // the V.32bis spec uses a single shared carrier at 1800 Hz both directions — echo cancellation separates the channels
+        carrier: 1800
       },
       V34: {
         // Same separation strategy as V32bis.
@@ -270,10 +274,11 @@ module.exports = {
   // ─────────────────────────────────────────────────────────────────────────────
   terminal: {
     // Greeting banner (shown after modem connect)
+    /*
     banner: [
       '',
       '  ╔═══════════════════════════════════════╗',
-      '  ║        S Y N T H M O D E M           ║',
+      '  ║        S Y N T H M O D E M            ║',
       '  ║     Telnet Gateway  v1.0              ║',
       '  ╚═══════════════════════════════════════╝',
       '',
@@ -281,6 +286,8 @@ module.exports = {
       '  Type QUIT to disconnect.',
       '',
     ].join('\r\n'),
+    */
+    banner: ['ABCDEFGHIJKLMNOPQRSTUVWXYZ'],
 
     // Prompt string
     prompt: 'CONNECT> ',

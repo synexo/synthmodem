@@ -11,6 +11,22 @@
  *  - Accept write(buf) calls and modulate them to audio
  *  - Emit 'audioOut' events with Float32Array to be sent via RTP
  *  - Detect silence/hangup
+ *
+ * ── TX pacing note ──────────────────────────────────────────────────────
+ *
+ * On Windows, Node.js setInterval with short intervals (≤20 ms) has poor
+ * timer resolution — Win32 default timer resolution is 15.6 ms and the
+ * actual inter-firing interval is highly variable. A naive
+ * setInterval(_txTick, 20) produces TX output at only 65-75% of wall-
+ * clock rate, which manifests as gaps and compressions on the RTP wire
+ * and destroys the bit timing of the modem's V.21 demodulator.
+ *
+ * The TX path now uses a wall-clock catch-up loop: on each timer fire,
+ * compute how much audio *should* have been produced by now based on
+ * the elapsed wall-clock time, and generate exactly that much. If a
+ * previous tick was late, the next tick produces a longer block to
+ * catch up. If ticks fire early, we generate nothing. This keeps
+ * long-term throughput locked to real-time regardless of timer jitter.
  */
 
 const { EventEmitter }    = require('events');
@@ -23,7 +39,9 @@ const log  = makeLogger('ModemDSP');
 const cfg  = config.modem;
 const rcfg = config.rtp;
 
-const BLOCK = rcfg.packetIntervalMs * rcfg.sampleRate / 1000; // 160 samples at 20ms/8kHz
+const SR          = rcfg.sampleRate;          // 8000
+const BLOCK       = rcfg.packetIntervalMs * SR / 1000; // 160 samples at 20ms/8kHz
+const SAMPLES_PER_MS = SR / 1000;
 
 class ModemDSP extends EventEmitter {
 
@@ -37,6 +55,10 @@ class ModemDSP extends EventEmitter {
     this._txTimer     = null;
     this._started     = false;
     this._rxBuf       = [];   // overflow buffer for received audio
+
+    // Wall-clock TX pacing.
+    this._txStartMs       = 0;
+    this._txSamplesEmitted = 0;
 
     // Wire up events
     this._handshake.on('connected', info => {
@@ -61,8 +83,13 @@ class ModemDSP extends EventEmitter {
     log.debug(`ModemDSP starting (${this._role})`);
     this._handshake.start();
 
-    // TX timer — generate one block of audio per packet interval
-    this._txTimer = setInterval(() => this._txTick(), rcfg.packetIntervalMs);
+    // Wall-clock-paced TX. Tick more frequently than packetIntervalMs
+    // (here: every 5ms) and generate only as much audio as wall-clock
+    // has advanced, in BLOCK-sized chunks. This keeps long-term
+    // throughput locked to real-time even if timer firing is jittery.
+    this._txStartMs = Date.now();
+    this._txSamplesEmitted = 0;
+    this._txTimer = setInterval(() => this._txTick(), 5);
   }
 
   stop() {
@@ -74,8 +101,24 @@ class ModemDSP extends EventEmitter {
   // ─── TX path ─────────────────────────────────────────────────────────────────
 
   _txTick() {
-    const audio = this._handshake.generateAudio(BLOCK);
-    this.emit('audioOut', audio);
+    // Compute how many samples should have been emitted by now based on
+    // wall-clock time since start. If we're behind, emit one or more
+    // BLOCK-sized packets to catch up. If we're ahead, do nothing.
+    const elapsedMs     = Date.now() - this._txStartMs;
+    const targetSamples = Math.floor(elapsedMs * SAMPLES_PER_MS);
+    const deficit       = targetSamples - this._txSamplesEmitted;
+    if (deficit <= 0) return;
+
+    // Emit in whole BLOCK units (160 samples = 20 ms). Rate-cap to
+    // 3 blocks per tick to avoid flooding if the event loop was severely
+    // backed up — that way we eventually catch up but don't burst.
+    let blocks = Math.min(3, Math.floor(deficit / BLOCK));
+    if (blocks === 0 && this._txSamplesEmitted === 0) blocks = 1;  // first tick always emits
+    for (let i = 0; i < blocks; i++) {
+      const audio = this._handshake.generateAudio(BLOCK);
+      this.emit('audioOut', audio);
+      this._txSamplesEmitted += BLOCK;
+    }
   }
 
   /**

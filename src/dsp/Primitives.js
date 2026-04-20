@@ -415,23 +415,64 @@ function generateTone(freq, durationMs, sampleRate, amplitude = 0.5) {
 }
 
 /**
- * Generate a tone with optional phase reversals (for ANSam).
+ * Generate ITU-T V.8 ANSam (modified answer tone).
+ *
+ * Spec (ITU-T V.8 §3.1, §3.2):
+ *
+ *   ANSam = 2100 Hz carrier, amplitude-modulated by a 15 Hz sinewave.
+ *   Envelope ranges between (0.8 ± 0.01) and (1.2 ± 0.01) times the
+ *   average amplitude — that is, envelope(t) = avg * (1 + 0.2 * sin(2π·15·t)).
+ *
+ *   Phase reversals: when network echo canceller disabling is required,
+ *   the 2100 Hz carrier shall be 180° phase-reversed every `reversalIntervalMs`
+ *   (typically 450 ms). The AM envelope is NOT phase-reversed — it runs
+ *   continuously across the carrier reversals.
+ *
+ *   Total duration per §8: 5 ± 1 s if not terminated by CM detection.
+ *
+ *   Power: per V.2, around -12 to -13 dBm at modem output. In our
+ *   normalized float signal that's about 0.15 peak (envelope max) when
+ *   later encoded to PCMU. A previous version used 0.45 peak which is
+ *   15+ dB too hot and causes codec distortion on the AM peaks.
+ *
+ * A previous implementation of this function produced only a 2100 Hz
+ * carrier with sign flips at reversalIntervalMs — no 15 Hz AM at all,
+ * which real modems recognise as legacy V.25 ANS, not ANSam. That is
+ * why V.8 negotiation was not happening.
+ *
+ * @param {number} durationMs
+ * @param {number} sampleRate
+ * @param {number} reversalIntervalMs  carrier phase-reversal interval (e.g. 450)
+ * @param {number} amplitude           peak amplitude of the modulated envelope
+ *                                     (default 0.15; the average amplitude is
+ *                                     amplitude/1.2 so envelope peaks reach `amplitude`)
+ * @returns {Float32Array}
  */
-function generateANSam(durationMs, sampleRate, reversalIntervalMs, amplitude = 0.5) {
-  const freq = 2100;
+function generateANSam(durationMs, sampleRate, reversalIntervalMs, amplitude = 0.15) {
   const n = Math.round(durationMs * sampleRate / 1000);
-  const reversalSamples = Math.round(reversalIntervalMs * sampleRate / 1000);
   const out = new Float32Array(n);
-  const phaseInc = TWO_PI * freq / sampleRate;
-  let phase = 0;
-  let sign = 1;
-  let reversalCounter = 0;
+  const carrierInc = TWO_PI * 2100 / sampleRate;
+  const amInc      = TWO_PI *   15 / sampleRate;
+  // Envelope peaks at 1.2 × avg, so avg = amplitude / 1.2.
+  const avgAmp = amplitude / 1.2;
+
+  let carrierPhase = 0;
+  let amPhase      = 0;
+  const samplesPerReversal = Math.round(reversalIntervalMs * sampleRate / 1000);
+  let samplesUntilReversal = samplesPerReversal;
+
   for (let i = 0; i < n; i++) {
-    out[i] = amplitude * sign * Math.cos(phase);
-    phase = (phase + phaseInc) % TWO_PI;
-    if (++reversalCounter >= reversalSamples) {
-      sign = -sign;
-      reversalCounter = 0;
+    // 15 Hz AM envelope — continuous across the whole tone.
+    const env = avgAmp * (1 + 0.2 * Math.sin(amPhase));
+    // 2100 Hz carrier — phase jumps by π every reversalIntervalMs.
+    out[i] = env * Math.cos(carrierPhase);
+
+    carrierPhase = (carrierPhase + carrierInc) % TWO_PI;
+    amPhase      = (amPhase + amInc) % TWO_PI;
+
+    if (--samplesUntilReversal <= 0) {
+      carrierPhase = (carrierPhase + Math.PI) % TWO_PI;
+      samplesUntilReversal = samplesPerReversal;
     }
   }
   return out;

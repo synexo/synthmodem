@@ -122,7 +122,20 @@ class TelnetProxy extends EventEmitter {
   }
 
   _sendStr(str) {
-    this._send(Buffer.from(str.replace(/\n/g, tcfg.lineEnding)));
+    // Accept strings, arrays of strings, numbers, anything. Coerce to a
+    // single string first. Arrays are joined with the configured line
+    // ending so a multi-line banner can be `['line 1', 'line 2']`.
+    let text;
+    if (Array.isArray(str)) {
+      text = str.join(tcfg.lineEnding);
+    } else if (typeof str === 'string') {
+      text = str;
+    } else if (str == null) {
+      text = '';
+    } else {
+      text = String(str);
+    }
+    this._send(Buffer.from(text.replace(/\n/g, tcfg.lineEnding)));
   }
 
   _sendBanner() {
