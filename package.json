@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "Modem-to-Telnet gateway over SIP — V.21 through V.34, G.711 RTP",
   "main": "src/index.js",
+  "gypfile": true,
   "scripts": {
     "start": "node src/index.js",
     "client": "node test-client/index.js",
-    "test": "node test-client/index.js --auto"
+    "test": "node test-client/index.js --auto",
+    "install": "node-gyp rebuild",
+    "rebuild": "node-gyp rebuild"
   },
   "dependencies": {
     "speaker": "^0.5.5"

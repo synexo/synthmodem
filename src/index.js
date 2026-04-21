@@ -20,7 +20,7 @@ const config           = require('../config');
   const has = (flag) => args.includes(flag);
   const proto = get('--force-proto');
   if (proto) {
-    const valid = ['V21','V22','V22bis','V23','V32bis','V34'];
+    const valid = ['V21','Bell103','V22','V22bis','V23','V32bis','V34'];
     if (!valid.includes(proto)) {
       console.error(`Unknown protocol "${proto}". Valid: ${valid.join(' ')}`);
       process.exit(1);

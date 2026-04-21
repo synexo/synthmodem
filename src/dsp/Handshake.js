@@ -44,8 +44,10 @@ const {
 } = require('./Primitives');
 const V8                  = require('./V8');
 const { V21 }             = require('./protocols/V21');
+const { Bell103 }         = require('./protocols/Bell103');
 const { V22, V22bis }     = require('./protocols/V22');
 const { V23, V32bis }     = require('./protocols/V32bis');
+const { V32bisAnswerer }  = require('./V32bisAnswerer');
 const { V34 }             = require('./protocols/V34');
 
 const log = makeLogger('Handshake');
@@ -55,12 +57,13 @@ const cfg = config.modem;
 // ─── Protocol registry ─────────────────────────────────────────────────────
 
 const PROTOCOLS = {
-  V21:    (role) => new V21(role),
-  V22:    (role) => new V22(role),
-  V22bis: (role) => new V22bis(role),
-  V23:    (role) => new V23(role),
-  V32bis: (role) => new V32bis(role),
-  V34:    (role) => new V34(role),
+  V21:     (role) => new V21(role),
+  Bell103: (role) => new Bell103(role),
+  V22:     (role) => new V22(role),
+  V22bis:  (role) => new V22bis(role),
+  V23:     (role) => new V23(role),
+  V32bis:  (role) => new V32bis(role),
+  V34:     (role) => new V34(role),
 };
 
 // ─── Detection constants ───────────────────────────────────────────────────
@@ -86,15 +89,16 @@ const V8_RESPONSE_TIMEOUT_MS = 15000;
 // ─── State machine ─────────────────────────────────────────────────────────
 
 const HS_STATE = {
-  IDLE:       'IDLE',
-  ANS_SEND:   'ANS_SEND',
-  V8_WAIT:    'V8_WAIT',       // Waiting for ANSam (originate) or CI/CM (answer)
-  V8_CM_TX:   'V8_CM_TX',      // Call side: transmitting CM, waiting for JM
-  V8_JM_TX:   'V8_JM_TX',      // Answer side: transmitting JM, waiting for CJ
-  V8_POST_CJ: 'V8_POST_CJ',    // 75 ms silence window before sigA/sigC
-  TRAINING:   'TRAINING',      // Protocol-specific training
-  DATA:       'DATA',
-  FAILED:     'FAILED',
+  IDLE:        'IDLE',
+  ANS_SEND:    'ANS_SEND',
+  V32_AC_SEND: 'V32_AC_SEND', // V.32bis forced: tx AC (600+3000 Hz), listen for caller AA at 1800 Hz
+  V8_WAIT:     'V8_WAIT',      // Waiting for ANSam (originate) or CI/CM (answer)
+  V8_CM_TX:    'V8_CM_TX',     // Call side: transmitting CM, waiting for JM
+  V8_JM_TX:    'V8_JM_TX',     // Answer side: transmitting JM, waiting for CJ
+  V8_POST_CJ:  'V8_POST_CJ',   // 75 ms silence window before sigA/sigC
+  TRAINING:    'TRAINING',     // Protocol-specific training
+  DATA:        'DATA',
+  FAILED:      'FAILED',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -196,7 +200,8 @@ class HandshakeEngine extends EventEmitter {
         //
         // For V.21 forced path keep TE_MS (1000 ms) which has been
         // verified working.
-        const teMs = (this._forced === 'V22' || this._forced === 'V22bis')
+        const teMs = (this._forced === 'V22' || this._forced === 'V22bis'
+                   || this._forced === 'V32bis')
           ? 75
           : TE_MS;
 
@@ -212,22 +217,50 @@ class HandshakeEngine extends EventEmitter {
         // V.25 answerer", which the modem handles by proceeding to its
         // configured modulation mode (V.21 / V.22 / V.22bis) without
         // V.8 negotiation — exactly what we want.
+        // After ANS + 75 ms Te silence, spandsp transmits USB1
+        // (unscrambled binary 1 at 1200 bps) as the V.22 answerer's
+        // training signal. Per V.22bis §6.3.1.1.2.a this is the correct
+        // first signal from the answering modem.
+        //
+        // IMPORTANT INTERACTION WITH V.32 AUTOMODE CALLERS:
+        // When a modern V.32-capable modem hears our plain ANS, it goes
+        // into automode and transmits continuous 1800 Hz Signal AA
+        // while listening for one of {1300 Hz, 1650 Hz, AC, USB1}.
+        //   - 1300 Hz = V.23 answerback
+        //   - 1650 Hz = V.21 answer channel
+        //   - AC      = V.32 Signal AC (600+3000 Hz)
+        //   - USB1    = V.22bis unscrambled binary 1 (our U11 from spandsp)
+        // If the caller detects USB1, it drops V.32 automode and proceeds
+        // as a V.22 originator.
+        //
+        // The 1800 Hz AA, however, leaks into spandsp's 1200 Hz RX
+        // bandpass filter and causes power-meter oscillation in the
+        // carrier_on/off hysteresis band. Each oscillation fires
+        // v22bis_restart() which resets tx.training back to
+        // INITIAL_TIMED_SILENCE — so our USB1 TX dies within ~800 ms
+        // and the caller never sees it. The caller then stays in V.32
+        // automode forever.
+        //
+        // The fix for that is in V22.js `_gateIfV32AA` — while the RX
+        // contains dominant 1800 Hz, we feed spandsp silence so its TX
+        // state machine stays in U11 (USB1). The caller then sees USB1,
+        // switches to V.22 originator, stops sending AA, and normal
+        // negotiation proceeds.
         log.info(`Initial silence (${initialDelay} ms) + plain ANS (${cfg.answerToneDurationMs} ms) + Te silence (${teMs} ms) before ${this._forced} training`);
         this._enqueueSilence(initialDelay);
         this._enqueue(generateTone(ANS_FREQ, cfg.answerToneDurationMs, SR, 0.15));
         this._enqueueSilence(teMs);
         this._state = HS_STATE.ANS_SEND;
-        // CRITICAL TIMING: we must transition into the forced protocol
-        // the instant the queued Te-silence is consumed — not via a
-        // setTimeout. Node.js setTimeout has jitter (tens of ms) under
-        // event-loop load, which would insert extra silence between Te
-        // and the start of V.22 training. V.22 spec allows only
-        // 75 ± 20 ms for Ta/Te; exceeding this causes strict hardware
+        // CRITICAL TIMING: transition into the forced protocol the
+        // instant the queued audio is consumed — not via a setTimeout.
+        // Node.js setTimeout has jitter that would insert extra silence
+        // between Te and the start of V.22 training. V.22 spec allows
+        // only 75 ± 20 ms for Te; exceeding this causes strict hardware
         // modems to abandon the call.
         //
         // Instead, we set a flag that generateAudio() checks each block.
-        // When the audio queue drains (which is sample-accurate because
-        // the TX samples are consumed by the RTP clock), the generator
+        // When the audio queue drains (sample-accurate because TX
+        // samples are consumed by the RTP clock), the generator
         // immediately calls _selectProtocol(). No jitter, no gap.
         this._pendingForcedProtocol = this._forced;
       } else {
@@ -316,14 +349,32 @@ class HandshakeEngine extends EventEmitter {
       if (pos < n) {
         const forced = this._pendingForcedProtocol;
         this._pendingForcedProtocol = null;
-        this._selectProtocol(forced);
-        if (this._protocol && this._protocol.generateAudio) {
-          const remaining = n - pos;
-          const live = this._protocol.generateAudio(remaining);
-          out.set(live.subarray(0, remaining), pos);
+        // V.32bis gets an extra step: AC/AA handshake before V.17 training.
+        // See _onV32AcSend handling below. For other protocols we go
+        // straight to training (the original path).
+        if (forced === 'V32bis') {
+          this._startV32AcSend();
+          if (this._state === HS_STATE.V32_AC_SEND) {
+            const remaining = n - pos;
+            const live = this._generateV32Ac(remaining);
+            out.set(live.subarray(0, remaining), pos);
+          }
+        } else {
+          this._selectProtocol(forced);
+          if (this._protocol && this._protocol.generateAudio) {
+            const remaining = n - pos;
+            const live = this._protocol.generateAudio(remaining);
+            out.set(live.subarray(0, remaining), pos);
+          }
         }
       }
       return out;
+    }
+
+    // V32_AC_SEND state: transmit V.32 Signal AC continuously while we
+    // listen for caller's AA on 1800 Hz. See _startV32AcSend.
+    if (this._state === HS_STATE.V32_AC_SEND) {
+      return this._generateV32Ac(n);
     }
 
     // TRAINING state with a pre-queued training burst (V.21, etc.): drain
@@ -401,6 +452,13 @@ class HandshakeEngine extends EventEmitter {
     // incoming carrier before we formally enter DATA state.
     if (this._state === HS_STATE.TRAINING && this._protocol) {
       this._protocol.receiveAudio(samples);
+      return;
+    }
+
+    // V.32bis AC-send state: process RX looking for caller AA at 1800 Hz
+    // + phase reversal. See _processV32AaRx.
+    if (this._state === HS_STATE.V32_AC_SEND) {
+      this._processV32AaRx(samples);
       return;
     }
 
@@ -811,6 +869,86 @@ class HandshakeEngine extends EventEmitter {
     };
   }
 
+
+  // ─── V.32bis answer-mode call-establishment (ITU-T V.32bis §5.2) ────────
+  //
+  // Delegates to the V32bisAnswerer class which implements the full
+  // answer-side signal sequence: AC/CA/AC handshake → S (ABAB) → S−
+  // (CDCD) → TRN → R1 → (wait for caller R2) → S → S− → TRN → R3 →
+  // (wait for caller E) → E → handoff to V.17 TX for B1 data phase.
+  //
+  // The answerer exposes events the Handshake engine subscribes to:
+  //   'phase' { from, to } — transition events for logging
+  //   'done'  { rate }     — handshake complete; time to start B1 data phase
+  //
+  // Timeout: if the sequencer doesn't reach 'done' within V32_TIMEOUT_MS,
+  // the Handshake engine fails out.
+
+  _startV32AcSend() {
+    log.info('V.32bis answer-mode call-establishment — starting sequencer');
+    this._state = HS_STATE.V32_AC_SEND;
+
+    this._v32Answerer = new V32bisAnswerer({
+      log: {
+        info:  (msg, ...rest) => log.info(msg, ...rest),
+        warn:  (msg, ...rest) => log.warn(msg, ...rest),
+        trace: (msg, ...rest) => log.trace ? log.trace(msg, ...rest) : null,
+      },
+      amp: 0.20,
+    });
+    this._v32Answerer.on('done', info => {
+      // Handshake signaling complete; hand off to V.17 for B1 data phase
+      // at the agreed rate. We use spandsp's V.17 TX via the existing
+      // V32bis protocol binding for the actual data modulation.
+      log.info(`V.32bis signaling complete (rate=${info.rate}) — handing off to V.17 for B1 data phase`);
+      if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+      this._selectProtocol('V32bis');
+    });
+    this._v32Answerer.on('failed', info => {
+      log.warn(`V.32bis sequencer failed: reason=${info.reason} — falling back to V.22bis`);
+      if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+      if (this._state !== HS_STATE.V32_AC_SEND) return;
+      // Clean up V.32bis answerer so it stops generating audio.
+      this._v32Answerer = null;
+      // Top-down fallback: V.32bis failed → drop tier to V.22bis. The
+      // caller modem may be a V.22bis modem that ignored our 1800 Hz AC
+      // probe (it doesn't speak V.32), or a V.32 modem that couldn't
+      // complete training. Either way, V.22bis is the next-best option;
+      // if it also fails the engine will emit handshake-failed.
+      log.info('Fallback: selecting V.22bis');
+      this._state = HS_STATE.TRAINING;
+      this._selectProtocol('V22bis');
+    });
+
+    // Failsafe timeout. Real caller may take up to 3s to start AA after
+    // our AC begins (per empirical observation from capture). Full
+    // sequence from AA-lock onward adds ~2 more seconds. Use 20s to
+    // give comfortable margin for slow-responding callers.
+    if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+    const TIMEOUT_MS = 20000;
+    this._timer = setTimeout(() => {
+      this._timer = null;
+      if (this._state !== HS_STATE.V32_AC_SEND) return;
+      const phase = this._v32Answerer ? this._v32Answerer.phase() : '?';
+      log.warn(`V.32bis call-establishment timed out (${TIMEOUT_MS} ms) in phase=${phase} — falling back to V.22bis`);
+      this._v32Answerer = null;
+      log.info('Fallback: selecting V.22bis');
+      this._state = HS_STATE.TRAINING;
+      this._selectProtocol('V22bis');
+    }, TIMEOUT_MS);
+  }
+
+  _generateV32Ac(n) {
+    if (!this._v32Answerer) return new Float32Array(n);
+    return this._v32Answerer.generate(n);
+  }
+
+  _processV32AaRx(samples) {
+    if (!this._v32Answerer) return;
+    this._v32Answerer.process(samples);
+  }
+
+
   // ─── Protocol selection and training ────────────────────────────────────
 
   _selectProtocol(name) {
@@ -844,7 +982,11 @@ class HandshakeEngine extends EventEmitter {
       // both so we can diagnose whether the far end is actually responding.
       if (this._protocol.on) {
         this._protocol.on('listening', () => {
-          log.info(`${name} TX training complete — listening for remote carrier`);
+          // Informational — the protocol module is accepting audio and
+          // its TX generator is producing training signals. The module
+          // keeps transmitting training until either the remote peer
+          // responds (TRAINING_SUCCEEDED) or the listen window expires.
+          log.info(`${name} sequencer running — listening for remote carrier`);
         });
         this._protocol.on('remote-detected', info => {
           log.info(`${name} remote carrier detected (rx RMS=${info.rms.toFixed(3)})`);

@@ -134,15 +134,96 @@ module.exports = {
     // (v8HandshakeTimeoutMs removed — Handshake.js hardcodes 15000 ms
     // since real modems need 5-12s after ANSam ends to complete CM.)
 
-    // ── Training & synchronisation ──
+    // ── Post-training idle hold ("V.42 Penalty Box") ──
+    // After modem training completes, we must transmit continuous mark-
+    // idle (scrambled binary 1s) for some seconds before sending any real
+    // payload. This is NOT optional for modern modems. Two reasons:
+    //
+    //   1. V.22/V.22bis spec-mandated idle: ITU-T V.22bis §6.3.1.2.2
+    //      requires the answerer to transmit scrambled binary 1s for
+    //      765 ms so the caller's descrambler can lock and the caller
+    //      can assert its own Carrier Detect. spandsp's TIMED_S11 stage
+    //      handles this internally before firing TRAINING_SUCCEEDED, so
+    //      by the time we see the 'connected' event this requirement is
+    //      already met.
+    //
+    //   2. V.42 / LAPM detection window: modern modems default to
+    //      V.42 error correction. After physical-layer training they
+    //      spend up to 8-10 seconds transmitting V.42 ODP (Originator
+    //      Detection Pattern) XID-like frames trying to initiate LAPM.
+    //      synthmodem does not implement V.42; we cannot respond to
+    //      ODP with an ADP or negotiate LAPM. So we must simply wait it
+    //      out. The caller's V.42 state machine will eventually notice
+    //      nothing is responding, drop into Normal/Direct mode, and
+    //      finally assert DCD to its DTE.
+    //
+    // During the hold, TWO things must be true:
+    //
+    //   A. We must NOT transmit payload bytes. To the caller, any
+    //      ASCII data arriving during V.42 ODP is line corruption, and
+    //      strict modems will drop the call. Our binding's get_bit
+    //      callback naturally outputs continuous mark-idle (all 1s,
+    //      scrambled by spandsp) when the byte queue is empty — which
+    //      is exactly what the caller needs to see. Implemented by
+    //      deferring the TelnetProxy attach until after the hold.
+    //
+    //   B. We must DISCARD received bytes. During the hold the caller
+    //      fires V.42 XID frames at us; they descramble to arbitrary
+    //      bytes that must not reach the TelnetProxy (the menu would
+    //      interpret them as user input and try to open TCP connections
+    //      to garbage hostnames). Implemented by deferring the normal
+    //      _dsp.on('data') → telnet.receive hookup until after the hold.
+    //
+    // HOLD STRATEGY — two-phase:
+    //
+    //   Phase 1 (MIN HOLD): unconditional `postTrainIdleMs` wait. Covers
+    //   the V.22 §6.3.1.2.2 tail and the shortest V.42 timers.
+    //
+    //   Phase 2 (QUIESCENCE WAIT): after the min hold, keep attaching
+    //   TelnetProxy deferred AS LONG AS the RX byte stream keeps flowing.
+    //   The caller finishes V.42 and drops into mark idle, which our
+    //   binding suppresses as 0xFF → no bytes emitted. So when the byte
+    //   stream goes quiet for `postTrainQuiescenceMs`, we attach.
+    //
+    // This adapts automatically to different modems:
+    //   - AT&Q0 (V.42 disabled): no bytes during hold, immediate attach
+    //     after postTrainIdleMs elapses.
+    //   - Modern modems with 2-3s V.42 timers: bytes flow 2-3s then stop;
+    //     attach fires ~500ms after that.
+    //   - Pathological modems with 8-9s V.42 timers: bytes flow for the
+    //     full window; attach fires ~500ms after they stop.
+    //   - Something pathological that never stops: `postTrainAttachMaxMs`
+    //     cap fires so we never wait forever.
+    // Default values here are tuned against real modem observations:
+    //
+    //   - 6000 ms min hold: empirically confirmed sufficient to let a
+    //     default-config consumer modem (V.42-enabled) complete its ODP
+    //     detection and fall back to Normal/Direct mode. 4000 ms was
+    //     NOT sufficient on the same modem. 3000 ms fires the banner
+    //     mid-V.42, which some modems tolerate and some don't.
+    //
+    //   - 500 ms quiescence: after V.42 finishes, the caller drops into
+    //     scrambled mark idle (0xFF through our binding, suppressed),
+    //     so the RX byte stream goes silent. 500 ms comfortably beats
+    //     worst-case inter-frame gaps in active V.42 ODP transmission.
+    //
+    //   - 15000 ms hard cap: for pathological modems that never quiesce.
+    //     We attach anyway after this; better to leak some bytes than
+    //     hang indefinitely.
+    postTrainIdleMs:         6000,   // Minimum hold duration (ms)
+    postTrainQuiescenceMs:   500,    // Time without RX bytes to declare V.42 done (ms)
+    postTrainAttachMaxMs:    15000,  // Hard cap on total wait (ms)
+
+
     // Duration of training sequence (ms) — varies per protocol, these are minimums
     trainingDurationMs: {
-      V21:    0,    // FSK — no training needed
-      V22:    600,
-      V22bis: 600,
-      V23:    0,
-      V32bis: 1024,
-      V34:    1500,
+      V21:     0,    // FSK — no training needed
+      Bell103: 0,    // FSK — no training needed
+      V22:     600,
+      V22bis:  600,
+      V23:     0,
+      V32bis:  1024,
+      V34:     1500,
     },
 
     // ── DSP internals ──

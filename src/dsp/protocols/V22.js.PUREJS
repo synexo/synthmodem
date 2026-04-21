@@ -1,0 +1,1667 @@
+'use strict';
+
+/**
+ * V.22 (1200 bps DQPSK) and V.22bis (2400 bps 16-QAM) — ITU-T V.22bis (1988)
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * This file implements the TX side ("foundation") per the ITU-T V.22bis
+ * specification. The RX side is kept simple here — the main goal of this
+ * revision is to produce a spec-conformant outbound signal that a real
+ * hardware modem can decode. RX refinement (LMS equalizer, Gardner timing
+ * recovery, Costas loop) comes in a separate pass once TX interop is proven.
+ *
+ * Key references:
+ *   - ITU-T V.22bis (1988), Fascicle VIII.1
+ *   - TI SPRA484 "V.22 bis Modem on Fixed-Point TMS320C2xx DSPs"
+ *
+ * Line parameters
+ * ───────────────
+ *   Carrier frequencies:  1200 ± 0.5 Hz (call/originate/low channel)
+ *                         2400 ± 1   Hz (answer/high channel)
+ *   Symbol rate:          600 baud (both directions)
+ *   Guard tone (high ch): 1800 ± 20 Hz at −6 ± 1 dB below data power
+ *   Pulse shape:          square root of raised-cosine, β = 0.75
+ *   Group delay:          ±150 µs over channel passband
+ *
+ * Scrambler (same polynomial both directions, per spec §5.1):
+ *   G(x) = 1 ⊕ x⁻¹⁴ ⊕ x⁻¹⁷
+ *   64-consecutive-ones detector inverts next scrambler input bit
+ *
+ * V.22 (1200 bps, dibit encoding, §2.5.2.2)
+ *   2 bits per symbol. Dibit → phase quadrant change per Table 1/V.22bis.
+ *   Signal point is always the "01" (V.22-compatible) position within
+ *   the new quadrant — i.e. at coordinates (±3, ±1).
+ *
+ * V.22bis (2400 bps, quadbit encoding, §2.5.2.1)
+ *   4 bits per symbol. First 2 bits (Q1,Q2) → phase quadrant change
+ *   per Table 1/V.22bis. Last 2 bits (Q3,Q4) → one of 4 points within
+ *   the new quadrant, per Figure 2/V.22bis.
+ *
+ * Constellation layout (Figure 2/V.22bis)
+ *   Points in the 4×4 grid at I,Q ∈ {−3, −1, +1, +3}. Four points per
+ *   quadrant selected by Q3,Q4:
+ *
+ *     Q3 Q4 | (|I|, |Q|)
+ *     ------+-----------
+ *     0  0  | (1, 1)   inner
+ *     0  1  | (3, 1)   V.22-compatible point  ← this is what V.22 always uses
+ *     1  0  | (1, 3)
+ *     1  1  | (3, 3)   outer
+ *
+ *   Sign of I and Q is determined by the current quadrant after the
+ *   differential phase change.
+ *
+ * TX signal level
+ * ───────────────
+ *   Target: −10 dBm on the line (TI SPRA484), which at our scale (peak 1.0
+ *   = full-scale μ-law) corresponds to approximately 0.15 peak amplitude.
+ *   Data power is computed over the RMS of the shaped I/Q signal —
+ *   we scale so the constellation outer point (3,3) maps to approximately
+ *   0.15 peak at the RF-modulated output (after pulse shaping).
+ */
+
+const { EventEmitter } = require('events');
+const { TWO_PI, BiquadFilter } = require('../Primitives');
+
+const SR           = 8000;            // RTP sample rate, fixed
+const BAUD         = 600;             // symbol rate per spec §2.5
+const SPS          = SR / BAUD;       // 13.333... samples per symbol (irrational)
+const CARRIER_LOW  = 1200;            // call/originate carrier
+const CARRIER_HIGH = 2400;            // answer carrier
+const GUARD_FREQ   = 1800;            // high-channel guard tone (§2.1)
+const GUARD_DB     = -6;              // guard tone relative to data (§2.2)
+
+// TX amplitude. The constellation grid uses integer coordinates (−3,−1,1,3).
+// Peak target for the outermost constellation point (3,3) after pulse
+// shaping. A real telecom V.22 transmit level is typically -13 to -10
+// dBm0. With PEAK=0.25 the scrambled-random-data RMS is roughly
+// 0.25 * 0.45 ≈ 0.11 → about -14 dBm0 on a linear (pre-μ-law) scale
+// — within the normal range.
+//
+// Previously this was 0.15, which placed the RMS closer to -19 dBm0.
+// That's several dB quieter than typical and leaves the receiver's
+// detector working in a low-SNR regime on a noisy line. Raising to
+// 0.25 gives the remote modem a cleaner, louder signal to lock onto
+// without clipping (peak instantaneous still < 1.0 with guard tone
+// disabled and SRRC sidelobes).
+const PEAK_TARGET  = 0.25;
+
+// SRRC β per V.22bis §2.4. "75% roll-off" = β = 0.75.
+const RRC_BETA     = 0.75;
+
+// SRRC pulse span (symbols). 6 symbols (3 each side of center) is standard
+// for β=0.75 and gives well below −60 dB truncation sidelobes. Span × SPS
+// samples ≈ 80 taps.
+const RRC_SPAN     = 6;
+
+// Differential phase encoding — first 2 bits of each symbol per V.22bis
+// Table 1. Bits (Q1, Q2) are the FIRST and SECOND bits in the data
+// stream (post-scrambler). Phase change applies to the CURRENT quadrant.
+//
+// Table 1/V.22bis:
+//     Q1 Q2 | Phase change
+//     ------+-------------
+//     0  0  |  +90°
+//     0  1  |    0°
+//     1  1  | +180°
+//     1  0  | +270°  (equivalently −90°)
+//
+// V.22 / V.22bis differential phase change per dibit (Q1, Q2), per
+// Table 1/V.22bis (which matches V.22 Table 1). The dibit is encoded as
+// a 2-bit binary value with Q1 being the first bit transmitted (MSB-ish
+// in our array indexing below).
+//
+//   Dibit (Q1 Q2) | Phase change
+//   --------------+--------------
+//     0 0         | +90°
+//     0 1         |   0°
+//     1 1         | +270°
+//     1 0         | +180°
+//
+// Index encoding: idx = (Q1 << 1) | Q2.
+//   idx 0 = 0b00 (Q1=0,Q2=0) → +90°
+//   idx 1 = 0b01 (Q1=0,Q2=1) →   0°
+//   idx 2 = 0b10 (Q1=1,Q2=0) → +180°
+//   idx 3 = 0b11 (Q1=1,Q2=1) → +270°
+const PHASE_CHANGE = [
+  Math.PI / 2,        // 00 → +90°
+  0,                  // 01 →   0°
+  Math.PI,            // 10 → +180°
+  3 * Math.PI / 2,    // 11 → +270°
+];
+
+// Quadrant-point offsets for V.22bis (last 2 bits Q3,Q4).
+// Per Figure 2/V.22bis, within quadrant 1 (upper right, +I +Q):
+//
+//     Q3 Q4 | (I, Q)
+//     ------+---------
+//     0  0  | (1, 1)
+//     0  1  | (3, 1)  ← V.22-compatible point
+//     1  0  | (1, 3)
+//     1  1  | (3, 3)
+//
+// Index encoding: idx = (Q3 << 1) | Q4.
+const QUADRANT_POINT = [
+  { i: 1, q: 1 },     // 00 → inner
+  { i: 3, q: 1 },     // 01 → V.22 compatible
+  { i: 1, q: 3 },     // 10 → middle-outer
+  { i: 3, q: 3 },     // 11 → outer
+];
+
+// ─── SRRC pulse shape ──────────────────────────────────────────────────────
+
+/**
+ * Square-root raised cosine impulse response evaluated at a single point.
+ * @param {number} t     Time, in symbol periods (not samples). t=0 is the
+ *                       symbol peak; t=±1 is the next symbol's peak.
+ * @param {number} beta  Roll-off factor (0..1). Spec uses 0.75.
+ * @returns {number}     h(t), scaled so h(0) = (1 + β(4/π − 1)) when β ≠ 0.
+ */
+function rrcImpulse(t, beta) {
+  // Two removable singularities: at t = 0, and at t = ±1/(4β).
+  const EPS = 1e-8;
+  if (Math.abs(t) < EPS) {
+    return 1 + beta * (4 / Math.PI - 1);
+  }
+  const tCrit = 1 / (4 * beta);
+  if (Math.abs(Math.abs(t) - tCrit) < EPS) {
+    return (beta / Math.sqrt(2)) *
+      ((1 + 2 / Math.PI) * Math.sin(Math.PI / (4 * beta)) +
+       (1 - 2 / Math.PI) * Math.cos(Math.PI / (4 * beta)));
+  }
+  const pit   = Math.PI * t;
+  const num   = Math.sin(pit * (1 - beta)) +
+                4 * beta * t * Math.cos(pit * (1 + beta));
+  const den   = pit * (1 - (4 * beta * t) * (4 * beta * t));
+  return num / den;
+}
+
+/**
+ * Pre-compute normalized SRRC tap coefficients for our default β and span.
+ * Returns { taps, span, centerOffset, gain } where:
+ *   - taps[] is the impulse response sampled at SR (one sample per 8 kHz tick)
+ *   - span is the length of taps in samples
+ *   - centerOffset is the index of the symbol peak (t=0) within taps
+ *   - gain is the peak tap value (for reference / scaling checks)
+ *
+ * These taps are not directly used for sample-by-sample modulation in this
+ * file (we compute the SRRC response on the fly per symbol), but are handy
+ * for the matched RX filter if the demodulator uses one.
+ */
+function buildRrcTaps(beta = RRC_BETA, span = RRC_SPAN) {
+  const totalSamples = Math.round(span * SPS);
+  const centerSample = totalSamples / 2;
+  const taps = new Float32Array(totalSamples);
+  let peak = 0;
+  for (let n = 0; n < totalSamples; n++) {
+    const t = (n - centerSample) / SPS;   // in symbol periods
+    taps[n] = rrcImpulse(t, beta);
+    if (Math.abs(taps[n]) > peak) peak = Math.abs(taps[n]);
+  }
+  return { taps, span: totalSamples, centerOffset: centerSample, gain: peak };
+}
+
+// Precomputed once at module load.
+const RRC = buildRrcTaps(RRC_BETA, RRC_SPAN);
+
+// ─── V.22bis scrambler with 64-consecutive-ones detector ──────────────────
+
+/**
+ * Scrambler per V.22bis §5.1 / §5.2 with 64-consecutive-ones bypass.
+ *
+ * Polynomial: 1 ⊕ x⁻¹⁴ ⊕ x⁻¹⁷  (same for both call and answer directions)
+ *
+ * For SCRAMBLING (TX side):
+ *   Ds = Di ⊕ Ds[x⁻¹⁴] ⊕ Ds[x⁻¹⁷]   (feedback uses output bits)
+ *   If 64 consecutive 1s appear at Ds, the NEXT input Di is inverted.
+ *
+ * For DESCRAMBLING (RX side):
+ *   Do = Ds ⊕ Ds[x⁻¹⁴] ⊕ Ds[x⁻¹⁷]   (feedback uses input bits)
+ *   If 64 consecutive 1s appear at Ds (input), the NEXT output Do is inverted.
+ */
+class V22Scrambler {
+  constructor() {
+    this._reg          = new Uint8Array(17);  // shift register, index 0 = newest
+    this._onesCount    = 0;
+    this._invertNext   = false;
+  }
+  reset() {
+    this._reg.fill(0);
+    this._onesCount = 0;
+    this._invertNext = false;
+  }
+  /** Scramble one input bit. Returns the scrambled output bit. */
+  scramble(bitIn) {
+    let di = bitIn & 1;
+    if (this._invertNext) { di ^= 1; this._invertNext = false; }
+    // Ds = Di ⊕ reg[13] ⊕ reg[16]   (x⁻¹⁴ and x⁻¹⁷ taps; 0-indexed)
+    const ds = di ^ this._reg[13] ^ this._reg[16];
+    // Shift register: newest bit (ds) → reg[0]
+    for (let i = 16; i > 0; i--) this._reg[i] = this._reg[i - 1];
+    this._reg[0] = ds;
+    // Count consecutive 1s at scrambler output
+    if (ds === 1) {
+      this._onesCount++;
+      if (this._onesCount >= 64) {
+        this._invertNext = true;
+        this._onesCount = 0;
+      }
+    } else {
+      this._onesCount = 0;
+    }
+    return ds;
+  }
+  /** Descramble one input bit. Returns the descrambled output bit. */
+  descramble(bitIn) {
+    const ds = bitIn & 1;
+    // Do = Ds ⊕ reg[13] ⊕ reg[16]
+    let dout = ds ^ this._reg[13] ^ this._reg[16];
+    if (this._invertNext) { dout ^= 1; this._invertNext = false; }
+    for (let i = 16; i > 0; i--) this._reg[i] = this._reg[i - 1];
+    this._reg[0] = ds;
+    // 64-ones detection on descrambler INPUT (Ds), matches §5.2
+    if (ds === 1) {
+      this._onesCount++;
+      if (this._onesCount >= 64) {
+        this._invertNext = true;
+        this._onesCount = 0;
+      }
+    } else {
+      this._onesCount = 0;
+    }
+    return dout;
+  }
+}
+
+// ─── Symbol mapping ────────────────────────────────────────────────────────
+
+/**
+ * Map a dibit (2 bits) or quadbit (4 bits) to a constellation point,
+ * updating `state.quadrant` per the differential phase encoding rule.
+ *
+ * @param {object}   state     {quadrant: 0..3} — updated in place
+ * @param {number[]} bits      scrambled bits [Q1,Q2] for V.22 or [Q1,Q2,Q3,Q4] for V.22bis
+ * @param {number}   bitsPerSymbol  2 (V.22) or 4 (V.22bis)
+ * @returns {{i:number, q:number}}  Constellation point in un-normalized units
+ *                                  (I,Q ∈ {±1, ±3})
+ */
+function mapSymbol(state, bits, bitsPerSymbol) {
+  const q1 = bits[0], q2 = bits[1];
+  // Update quadrant per differential phase change. Quadrants are numbered
+  // 0..3 counterclockwise starting at upper-right:
+  //   0: (+I, +Q)   quadrant 1
+  //   1: (−I, +Q)   quadrant 2
+  //   2: (−I, −Q)   quadrant 3
+  //   3: (+I, −Q)   quadrant 4
+  // Phase changes in PHASE_CHANGE[] are added to the carrier reference,
+  // so e.g. +90° advances by 1 quadrant counterclockwise.
+  const phaseIdx  = (q1 << 1) | q2;
+  const dQuadrant = Math.round(PHASE_CHANGE[phaseIdx] / (Math.PI / 2)) % 4;
+  state.quadrant  = (state.quadrant + dQuadrant) % 4;
+
+  // Pick the magnitude point within the new quadrant.
+  let mag;
+  if (bitsPerSymbol === 2) {
+    // V.22: always the "01" V.22-compatible point (I=3, Q=1) magnitudes.
+    mag = QUADRANT_POINT[1];
+  } else {
+    // V.22bis: Q3,Q4 select the point.
+    const q3 = bits[2], q4 = bits[3];
+    mag = QUADRANT_POINT[(q3 << 1) | q4];
+  }
+
+  // Apply sign based on quadrant. We produced (i, q) with both positive
+  // (the quadrant-1 coordinates). To get the final (I, Q) in the actual
+  // target quadrant we ROTATE by (quadrant * 90°):
+  //   N=0: (+i, +q)           (quadrant 1)
+  //   N=1: (-q, +i)            (quadrant 2) — rotated +90°
+  //   N=2: (-i, -q)            (quadrant 3) — rotated +180°
+  //   N=3: (+q, -i)            (quadrant 4) — rotated +270°
+  //
+  // This is required for V.22-compatible points like (3, 1) where the
+  // |I| and |Q| magnitudes swap when rotated through odd-numbered
+  // quadrants.
+  let i = mag.i, q = mag.q;
+  switch (state.quadrant) {
+    case 1: { const ni = -q; const nq =  i; i = ni; q = nq; break; }
+    case 2: { i = -i; q = -q; break; }
+    case 3: { const ni =  q; const nq = -i; i = ni; q = nq; break; }
+  }
+  return { i, q };
+}
+
+// ─── Modulator ─────────────────────────────────────────────────────────────
+
+/**
+ * V.22 / V.22bis transmitter.
+ *
+ * The modulator produces audio by:
+ *  1. Pulling bits from a queue (UART-framed user bytes + scrambled marking
+ *     when the queue is empty)
+ *  2. Mapping each dibit/quadbit to a constellation I/Q point
+ *  3. Convolving the impulse-train of constellation points with the SRRC
+ *     pulse shape, computed on the fly from the last RRC_SPAN symbols
+ *  4. Mixing the baseband I,Q onto the carrier: s(t) = I·cos(2πfc t) − Q·sin(2πfc t)
+ *  5. (Answer channel only) Adding the 1800 Hz guard tone at −6 dB
+ *
+ * Symbol timing uses a sub-sample-accurate accumulator (no rounding drift).
+ * The long-term baud rate is exactly 600 Hz regardless of call length.
+ */
+class QAMModulator {
+  /**
+   * @param {object} opts
+   * @param {number} opts.carrier         1200 or 2400 (Hz)
+   * @param {number} opts.bitsPerSymbol   2 (V.22) or 4 (V.22bis)
+   * @param {boolean} opts.guardTone      true = emit 1800 Hz guard tone
+   */
+  constructor({ carrier, bitsPerSymbol, guardTone }) {
+    this._carrier        = carrier;
+    this._bps            = bitsPerSymbol;
+    this._guardToneOn    = !!guardTone;
+    this._scrambler      = new V22Scrambler();
+    this._bitQueue       = [];     // UART-framed bits awaiting transmission
+    this._diffState      = { quadrant: 0 };
+
+    // Handshake/training mode. setMode() controls these; default is
+    // normal data operation (scramble user bytes from _bitQueue).
+    this._scramblerBypass = false;
+    this._forcedBitFn     = null;
+
+    // Symbol ring buffer holding the most recent RRC_SPAN+1 symbols and
+    // their sample-time of emission. Each entry: {i, q, startSample}.
+    // The oldest symbol older than RRC_SPAN symbols is trimmed each tick.
+    this._symbols        = [];
+
+    // Sub-sample-accurate symbol timing. We emit a new symbol when the
+    // running sample counter crosses a multiple of SPS. Over 3 symbols
+    // this produces 14+13+13 = 40 samples at 8 kHz, i.e. exactly 600 baud.
+    this._sampleCounter  = 0;
+    this._nextSymbolAt   = 0;      // sample index of next symbol start
+
+    // Carrier NCO phase (accumulates per-sample).
+    this._carrierPhase   = 0;
+    this._carrierInc     = TWO_PI * this._carrier / SR;
+
+    // Guard tone NCO (used only on answer channel).
+    this._guardPhase     = 0;
+    this._guardInc       = TWO_PI * GUARD_FREQ / SR;
+
+    // Scaling constants. The outer constellation point is (3,3), peak
+    // shaped magnitude at the output is (3 * h_peak) where h_peak is the
+    // SRRC peak tap. After RF-mixing (cos, sin) the peak sample is
+    // √(I² + Q²) ≈ 3√2 · h_peak for outer points. We scale so this
+    // equals PEAK_TARGET (0.15).
+    //
+    // Per V.22bis §2.2, when the 1800 Hz guard tone is enabled, data
+    // signal level is ~1 dB lower in the high channel than in the low
+    // channel, so that combined data+guard power stays close to target.
+    // We apply that 1 dB reduction here to data amplitude.
+    const dataLevelAdj   = this._guardToneOn ? Math.pow(10, -1/20) : 1;
+    const rawOuterPeak   = 3 * Math.SQRT2 * RRC.gain;
+    this._ampData        = (PEAK_TARGET * dataLevelAdj) / rawOuterPeak;
+    // Guard tone is 6 dB below data POWER (per V.22bis §2.2, ±1 dB).
+    // Empirically, the 16-QAM RF signal (post pulse shaping) has RMS
+    // close to PEAK_TARGET × 0.45 when scrambled data is random. For
+    // guard to be 6 dB below data power:
+    //   guard_rms = data_rms / 2
+    //   guard_sine_amp = guard_rms × √2
+    const dataRmsEst     = PEAK_TARGET * dataLevelAdj * 0.45;
+    this._ampGuard       = dataRmsEst * Math.pow(10, GUARD_DB / 20) * Math.SQRT2;
+  }
+
+  reset() {
+    this._scrambler.reset();
+    this._bitQueue       = [];
+    this._diffState      = { quadrant: 0 };
+    this._symbols        = [];
+    this._sampleCounter  = 0;
+    this._nextSymbolAt   = 0;
+    this._carrierPhase   = 0;
+    this._guardPhase     = 0;
+    this._scramblerBypass = false;
+    this._forcedBitFn     = null;
+  }
+
+  /**
+   * Set handshake TX mode. Modes:
+   *   'data'       — normal operation: queued user bytes, scrambled
+   *   'unscr-ones' — unscrambled binary 1 (all bits = 1, scrambler bypassed)
+   *   'dibit-00'   — unscrambled dibits all = 00 (only meaningful for V.22)
+   *   'dibit-11'   — unscrambled dibits all = 11
+   *   'alt-00-11'  — alternating dibits 00, 11, 00, 11 (unscrambled)
+   *                  (this is the §6.3 "double-dibit 00/11" training signal)
+   *   'scr-ones'   — scrambled binary 1 (input = 1 always, scrambler active)
+   *
+   * Changing mode flushes the pending-bit queue.
+   */
+  setMode(mode) {
+    this._bitQueue = [];
+    switch (mode) {
+      case 'data':
+        this._scramblerBypass = false;
+        this._forcedBitFn     = null;
+        break;
+      case 'unscr-ones':
+        this._scramblerBypass = true;
+        this._forcedBitFn     = () => 1;
+        break;
+      case 'dibit-00':
+        this._scramblerBypass = true;
+        this._forcedBitFn     = () => 0;
+        break;
+      case 'dibit-11':
+        this._scramblerBypass = true;
+        this._forcedBitFn     = () => 1;
+        break;
+      case 'alt-00-11': {
+        // Emit 0,0,1,1,0,0,1,1,... so as dibits this is 00,11,00,11,...
+        let n = 0;
+        this._scramblerBypass = true;
+        this._forcedBitFn     = () => ((n++ >> 1) & 1);
+        break;
+      }
+      case 'scr-ones':
+        this._scramblerBypass = false;
+        this._forcedBitFn     = () => 1;
+        break;
+      default:
+        throw new Error('Unknown mode: ' + mode);
+    }
+  }
+
+  /** Queue bytes for asynchronous 10-bit UART framing: start + 8LSB + 2×stop. */
+  write(bytes) {
+    for (const byte of bytes) {
+      this._bitQueue.push(0);                              // start bit
+      for (let b = 0; b < 8; b++) this._bitQueue.push((byte >> b) & 1);
+      this._bitQueue.push(1);                              // stop bit
+      this._bitQueue.push(1);                              // 2nd stop bit
+    }
+  }
+
+  /** True when there are no pending bits (idle marking). */
+  get idle() { return this._bitQueue.length === 0; }
+
+  /**
+   * Change the bits-per-symbol during operation. Used by V.22bis handshake
+   * to start at 1200 bps (2 bits/symbol) and later switch to 2400 bps
+   * (4 bits/symbol). Flushes pending bits to avoid mixed-framing.
+   */
+  setBitsPerSymbol(bps) {
+    if (bps !== 2 && bps !== 4) throw new Error('bps must be 2 or 4');
+    this._bps = bps;
+    this._bitQueue = [];
+  }
+
+  get bitsPerSymbol() { return this._bps; }
+
+  /** Consume one unscrambled bit from the queue, from _forcedBitFn, or 1 (idle mark). */
+  _nextRawBit() {
+    if (this._forcedBitFn) return this._forcedBitFn();
+    return this._bitQueue.length > 0 ? this._bitQueue.shift() : 1;
+  }
+
+  /** Generate the next constellation symbol and append to ring buffer. */
+  _generateNextSymbol(startSample) {
+    const bits = new Array(this._bps);
+    for (let b = 0; b < this._bps; b++) {
+      const raw = this._nextRawBit();
+      bits[b] = this._scramblerBypass ? raw : this._scrambler.scramble(raw);
+    }
+    const pt = mapSymbol(this._diffState, bits, this._bps);
+    this._symbols.push({ i: pt.i, q: pt.q, startSample });
+    // Trim old symbols that can no longer contribute to current output.
+    const cutoff = startSample - RRC.span;
+    while (this._symbols.length > 0 && this._symbols[0].startSample < cutoff) {
+      this._symbols.shift();
+    }
+  }
+
+  /**
+   * Generate numSamples of TX audio. The symbol/RRC state is persistent
+   * across calls, so a symbol boundary that falls between blocks is
+   * handled transparently — the same SRRC-shaped output comes out
+   * regardless of how the caller chunks the request.
+   */
+  generate(numSamples) {
+    const out = new Float32Array(numSamples);
+
+    for (let n = 0; n < numSamples; n++) {
+      const absSample = this._sampleCounter;
+
+      // Emit a new symbol if it's time. SPS is 13.333..., so the symbol
+      // boundaries at sample positions 0, 13.33, 26.66, 40.00, 53.33, ...
+      // align to integer samples as 0, 13, 27, 40, 53, 67, 80, ... —
+      // exactly 14+13+13 = 40 every 3 symbols.
+      while (absSample >= this._nextSymbolAt) {
+        this._generateNextSymbol(this._nextSymbolAt);
+        // Advance symbol boundary by SPS; integer-floor'ed per-symbol
+        // but long-term exact.
+        this._nextSymbolAt += SPS;
+      }
+
+      // Compute shaped I and Q at this sample by summing contributions
+      // from all symbols within ±RRC_SPAN/2 symbol periods.
+      let bbI = 0, bbQ = 0;
+      for (let k = 0; k < this._symbols.length; k++) {
+        const sym = this._symbols[k];
+        // Time since the symbol's center in symbol periods. The SRRC
+        // pulse has total span RRC_SPAN = 6 symbols centred on the
+        // peak — 3 symbols of precursor (left half) and 3 symbols of
+        // postcursor (right half). We peg the peak at
+        //   startSample + (RRC_SPAN/2) * SPS
+        // (i.e. 3 symbol periods AFTER the symbol is enqueued). That
+        // way, when we compute the audio output at time startSample,
+        // we're at tSym = -RRC_SPAN/2 — the very start of the pulse
+        // precursor. If the peak were placed at startSample + SPS/2
+        // (naïve "centre of the symbol's own period"), the precursor
+        // would extend back to startSample - 2.5*SPS — a window of
+        // past audio samples that were emitted BEFORE this symbol
+        // was inserted and thus never received its precursor
+        // contribution. That truncation produces a distorted pulse
+        // whose zero crossings aren't where timing recovery expects
+        // them. The fixed +RRC_SPAN/2 offset introduces (RRC_SPAN/2)
+        // × SPS ≈ 4 ms of TX latency but gives the receiver a clean,
+        // properly-shaped SRRC pulse to lock onto.
+        const tSym = (absSample - (sym.startSample + (RRC_SPAN / 2) * SPS)) / SPS;
+        if (Math.abs(tSym) > RRC_SPAN / 2) continue;
+        const h = rrcImpulse(tSym, RRC_BETA);
+        bbI += sym.i * h;
+        bbQ += sym.q * h;
+      }
+
+      // Apply RF mixing: s(t) = I·cos(2πfc t) − Q·sin(2πfc t)
+      const cs = Math.cos(this._carrierPhase);
+      const sn = Math.sin(this._carrierPhase);
+      let sample = this._ampData * (bbI * cs - bbQ * sn);
+
+      // Add guard tone (high-channel only)
+      if (this._guardToneOn) {
+        sample += this._ampGuard * Math.cos(this._guardPhase);
+        this._guardPhase += this._guardInc;
+        if (this._guardPhase > TWO_PI) this._guardPhase -= TWO_PI;
+      }
+
+      this._carrierPhase += this._carrierInc;
+      if (this._carrierPhase > TWO_PI) this._carrierPhase -= TWO_PI;
+
+      out[n] = sample;
+      this._sampleCounter++;
+    }
+
+    return out;
+  }
+}
+
+// ─── Demodulator (minimal, for TX-side-only validation) ────────────────────
+
+/**
+ * Minimal V.22/V.22bis demodulator.
+ *
+ * This is intentionally basic. It provides:
+ *   - Carrier mixing (open-loop NCO at nominal frequency)
+ *   - SRRC matched filter
+ *   - Sub-sample-accurate symbol timing (no Gardner, just fixed)
+ *   - Differential phase decoder (for V.22)
+ *   - 16-point slicer (for V.22bis)
+ *   - Descrambling
+ *   - UART framing
+ *
+ * It works for self-loopback testing and can decode our own TX cleanly.
+ * It will NOT perform well on a real-modem-sourced signal without an
+ * LMS equalizer, Gardner timing recovery, and a Costas loop. Those come
+ * in a later pass.
+ */
+class QAMDemodulator extends EventEmitter {
+  constructor({ carrier, bitsPerSymbol }) {
+    super();
+    this._carrier      = carrier;
+    this._bps          = bitsPerSymbol;
+    this._descrambler  = new V22Scrambler();
+    this._diffState    = { quadrant: 0 };
+
+    // Carrier NCO
+    this._carrierPhase = 0;
+    this._carrierInc   = TWO_PI * this._carrier / SR;
+
+    // Matched filter delay line (SRRC taps for I and Q baseband)
+    this._mfLen        = RRC.span;
+    this._mfI          = new Float32Array(this._mfLen);
+    this._mfQ          = new Float32Array(this._mfLen);
+    this._mfPos        = 0;
+
+    // Symbol sampling phase. Sample at middle of each symbol (center of
+    // matched-filter peak). Accumulator wraps at SPS.
+    this._symPhase     = SPS / 2;    // start half-symbol in
+
+    // Previous detected constellation (for differential decoding)
+    this._prevI        = 0;
+    this._prevQ        = 0;
+    this._hasPrev      = false;
+
+    // Warmup: the matched filter needs ≈ RRC_SPAN/2 = 3 symbols to reach
+    // steady-state after the first input arrives. Until then, received
+    // symbol samples are low-magnitude noise. Skip them before starting
+    // differential decoding — otherwise we set a garbage phase reference
+    // and every subsequent decision is offset by some random quadrant.
+    this._warmupSymbols = 0;
+    this._warmupNeeded  = RRC_SPAN + 2;  // 8 symbols of safety margin
+
+    // UART framing
+    this._uartState    = 'IDLE';
+    this._uartBits     = [];
+    this._uartCount    = 0;
+
+    // Running constellation magnitude (post-matched-filter). Real V.22
+    // signal on the expected carrier produces consistent, strong symbol
+    // magnitudes (~0.05+ measured on real captures). Out-of-band junk
+    // and noise produce much smaller magnitudes (<0.01). V.22 handshake
+    // gates remote-detected on sustained high magnitude so we don't
+    // falsely latch onto guard tones / echoes / line junk.
+    this._symbolMagSmoothed = 0;
+    this._symbolsSeen       = 0;
+
+    // Ring buffer of recent phase quadrant deltas (0, 1, 2, 3 for
+    // 0°/90°/180°/270°). Used by the V.22bis handshake layer to
+    // detect S1 (unscrambled double-dibit 00/11) — which appears as
+    // a consistent alternating sequence 1, 3, 1, 3, ... (+90°, +270°,
+    // ...). Kept short (16 entries ≈ 27 ms of symbol history at 600
+    // baud) so detection is responsive to phase changes.
+    this._dQuadHistory      = new Int8Array(16);
+    this._dQuadHistoryPos   = 0;
+    this._dQuadHistoryLen   = 0;
+  }
+
+  reset() {
+    this._descrambler.reset();
+    this._diffState    = { quadrant: 0 };
+    this._carrierPhase = 0;
+    this._mfI.fill(0); this._mfQ.fill(0); this._mfPos = 0;
+    this._symPhase     = SPS / 2;
+    this._prevI        = 0; this._prevQ = 0;
+    this._hasPrev      = false;
+    this._warmupSymbols = 0;
+    this._absMean      = undefined;
+    this._uartState    = 'IDLE';
+    this._uartBits     = [];
+    this._uartCount    = 0;
+    this._symbolMagSmoothed = 0;
+    this._symbolsSeen       = 0;
+    this._dQuadHistory.fill(0);
+    this._dQuadHistoryPos   = 0;
+    this._dQuadHistoryLen   = 0;
+  }
+
+  /** Smoothed average |symbol| magnitude at the matched-filter output.
+   *  High values mean we're locked onto real V.22 signal at this carrier. */
+  get symbolMag() { return this._symbolMagSmoothed; }
+  get symbolsSeen() { return this._symbolsSeen; }
+
+  /** Most recent phase-quadrant deltas in chronological order.
+   *  Each entry is 0/1/2/3 corresponding to 0°/90°/180°/270° phase
+   *  change between consecutive symbols. Used by V.22bis handshake
+   *  for S1 pattern detection. Returns up to ring-buffer capacity. */
+  getRecentDQuads() {
+    const len = this._dQuadHistoryLen;
+    const out = new Int8Array(len);
+    const cap = this._dQuadHistory.length;
+    // Oldest entry is at (pos - len) mod cap
+    let src = (this._dQuadHistoryPos - len + cap) % cap;
+    for (let i = 0; i < len; i++) {
+      out[i] = this._dQuadHistory[src];
+      src = (src + 1) % cap;
+    }
+    return out;
+  }
+
+  receiveAudio(samples) { this.process(samples); }
+
+  process(samples) {
+    for (let n = 0; n < samples.length; n++) {
+      const x = samples[n];
+
+      // Demodulate to baseband by mixing with carrier reference.
+      const cs = Math.cos(this._carrierPhase);
+      const sn = Math.sin(this._carrierPhase);
+      this._carrierPhase += this._carrierInc;
+      if (this._carrierPhase > TWO_PI) this._carrierPhase -= TWO_PI;
+
+      // Baseband I and Q (×2 because of double-frequency product)
+      const bbI =  2 * x * cs;
+      const bbQ = -2 * x * sn;
+
+      // Push into matched-filter delay line (I and Q independent)
+      this._mfI[this._mfPos] = bbI;
+      this._mfQ[this._mfPos] = bbQ;
+      this._mfPos = (this._mfPos + 1) % this._mfLen;
+
+      // Symbol timing: decrement phase by 1 each sample. When it crosses
+      // zero, sample and reset to SPS.
+      this._symPhase -= 1;
+      if (this._symPhase <= 0) {
+        // Matched-filter output at center: convolve delay line with SRRC.
+        // Center tap is at RRC.centerOffset back from current mfPos.
+        let accI = 0, accQ = 0;
+        for (let k = 0; k < this._mfLen; k++) {
+          const idx = (this._mfPos - 1 - k + this._mfLen) % this._mfLen;
+          const tap = RRC.taps[k];
+          accI += this._mfI[idx] * tap;
+          accQ += this._mfQ[idx] * tap;
+        }
+        this._onSymbol(accI, accQ);
+        this._symPhase += SPS;
+      }
+    }
+  }
+
+  _onSymbol(symI, symQ) {
+    // Track running symbol magnitude — used by the handshake layer to
+    // verify we're really locked onto V.22 at this carrier (not just
+    // picking up out-of-band noise / guard tone / line junk).
+    const mag = Math.sqrt(symI * symI + symQ * symQ);
+    this._symbolMagSmoothed = this._symbolMagSmoothed * 0.9 + mag * 0.1;
+    this._symbolsSeen++;
+
+    // Warmup skip: the matched filter convolves over RRC_SPAN/2 ≈ 3
+    // symbols on either side of the target. Until enough symbols have
+    // flowed through, our output is low-magnitude transients. If we
+    // start differential decoding during warmup, the random phase
+    // changes pollute our absolute quadrant state and every V.22bis
+    // amplitude decision is rotated by a random offset thereafter.
+    if (this._warmupSymbols < this._warmupNeeded) {
+      this._warmupSymbols++;
+      return;
+    }
+
+    if (!this._hasPrev) {
+      this._prevI = symI; this._prevQ = symQ; this._hasPrev = true;
+      return;
+    }
+
+    // Compute phase change from previous to current symbol → select
+    // quadrant change → recover (Q1, Q2) per the inverse of Table 1.
+    const prevAng = Math.atan2(this._prevQ, this._prevI);
+    const curAng  = Math.atan2(symQ, symI);
+    let dAng = curAng - prevAng;
+    while (dAng <    0)    dAng += TWO_PI;
+    while (dAng >= TWO_PI) dAng -= TWO_PI;
+    const dQuad = Math.round(dAng / (Math.PI / 2)) % 4;
+
+    // Record dQuad in the ring buffer — the V.22bis handshake layer
+    // scans this to detect S1 (double-dibit 00/11 = alternating +90°,
+    // +270° = dQuad sequence 1, 3, 1, 3, ...).
+    this._dQuadHistory[this._dQuadHistoryPos] = dQuad;
+    this._dQuadHistoryPos = (this._dQuadHistoryPos + 1) % this._dQuadHistory.length;
+    if (this._dQuadHistoryLen < this._dQuadHistory.length) this._dQuadHistoryLen++;
+
+    // Inverse of PHASE_CHANGE[(Q1<<1)|Q2], matching the corrected
+    // forward table (V.22 Table 1):
+    //   quadrant change | (Q1, Q2)
+    //   ----------------+---------
+    //    0 (0°)         | (0, 1)
+    //    1 (+90°)       | (0, 0)
+    //    2 (+180°)      | (1, 0)
+    //    3 (+270°)      | (1, 1)
+    const Q1Q2_FROM_DQUAD = [
+      [0, 1],   // 0°
+      [0, 0],   // 90°
+      [1, 0],   // 180°
+      [1, 1],   // 270°
+    ];
+    const [q1Scr, q2Scr] = Q1Q2_FROM_DQUAD[dQuad];
+
+    // Descramble phase bits into user bits and push into UART framer.
+    this._onDataBit(this._descrambler.descramble(q1Scr));
+    this._onDataBit(this._descrambler.descramble(q2Scr));
+
+    // Update tracked quadrant (must match transmitter's state)
+    this._diffState.quadrant = (this._diffState.quadrant + dQuad) % 4;
+
+    if (this._bps === 4) {
+      // Decode Q3, Q4 from amplitude within the newly-entered quadrant.
+      // Rotate (symI, symQ) BACK to quadrant 1 by applying the inverse
+      // of the forward rotation used by the modulator:
+      //   from N=0: (+I, +Q)        →  (I, Q)
+      //   from N=1: (-q, +i)         →  inverse is (+Q, -I) i.e. (I,Q) = (Q, -I)
+      //   from N=2: (-I, -Q)        →  (−I, −Q)
+      //   from N=3: (+q, −i)        →  inverse is (−Q, +I) i.e. (I,Q) = (−Q, I)
+      let magI = symI, magQ = symQ;
+      switch (this._diffState.quadrant) {
+        case 1: { const ni =  magQ; const nq = -magI; magI = ni; magQ = nq; break; }
+        case 2: { magI = -magI; magQ = -magQ; break; }
+        case 3: { const ni = -magQ; const nq =  magI; magI = ni; magQ = nq; break; }
+      }
+
+      // Euclidean nearest-neighbor slicer for the 4 points within the
+      // now-rotated-to-quadrant-1 constellation: (1,1), (3,1), (1,3), (3,3).
+      // We need to scale symI/symQ by the estimated gain. Track the per-
+      // axis magnitude and assume outer axis → magnitude 3.
+      //
+      // Long-term per-axis statistics: the axes each take values in {1,3}
+      // (post-rotation, after taking absolute values), with the outer
+      // value appearing for half of all symbols in random data. So the
+      // mean of abs(magI) is (1+3)/2 = 2. We scale so that the mean =
+      // 2, i.e. dividing by _scaleEst/2.
+      const aI = Math.abs(magI), aQ = Math.abs(magQ);
+      if (this._absMean === undefined) this._absMean = (aI + aQ) / 2;
+      // Slow-moving mean of abs axis magnitude. Steady-state target: 2.
+      this._absMean = this._absMean * 0.99 + ((aI + aQ) / 2) * 0.01;
+      const gain = this._absMean > 1e-6 ? (2 / this._absMean) : 1;
+      const scaledI = aI * gain;
+      const scaledQ = aQ * gain;
+
+      // Nearest-neighbor to {1, 3}²: pick whichever is closer for each axis.
+      //   (scaledI, scaledQ) →
+      //     I closer to 1 (iOuter=0) or closer to 3 (iOuter=1)
+      //     Q closer to 1 (qOuter=0) or closer to 3 (qOuter=1)
+      //
+      // Threshold for "closer to 3 than to 1" is midpoint = 2.
+      const iIsOuter = scaledI > 2 ? 1 : 0;
+      const qIsOuter = scaledQ > 2 ? 1 : 0;
+
+      // Map (|I|, |Q|) back to (Q3, Q4). From QUADRANT_POINT[]:
+      //   (1,1)=00, (3,1)=01, (1,3)=10, (3,3)=11
+      // So Q3 (MSB) = 1 iff |Q|=3 (q is outer),
+      //    Q4 (LSB) = 1 iff |I|=3 (i is outer).
+      const q3 = qIsOuter;
+      const q4 = iIsOuter;
+      this._onDataBit(this._descrambler.descramble(q3));
+      this._onDataBit(this._descrambler.descramble(q4));
+    }
+
+    this._prevI = symI; this._prevQ = symQ;
+  }
+
+  _onDataBit(bit) {
+    if (this._uartState === 'IDLE') {
+      if (bit === 0) {
+        this._uartState = 'DATA';
+        this._uartBits  = [];
+        this._uartCount = 0;
+      }
+    } else if (this._uartState === 'DATA') {
+      this._uartBits.push(bit);
+      if (++this._uartCount === 8) this._uartState = 'STOP';
+    } else if (this._uartState === 'STOP') {
+      if (bit === 1) {
+        let byte = 0;
+        for (let k = 0; k < 8; k++) byte |= this._uartBits[k] << k;
+        this.emit('data', Buffer.from([byte]));
+      }
+      this._uartState = 'IDLE';
+    }
+  }
+}
+
+// ─── Protocol wrappers ─────────────────────────────────────────────────────
+
+/**
+ * V.22 protocol adapter. 1200 bps, dibit-only (V.22-compatible
+ * constellation point).
+ *
+ * Answer-side handshake per ITU-T V.22bis §6.3.1.2.2 (a,b,c):
+ *   (a) Transmit unscrambled binary 1 at 1200 bit/s.
+ *   (b) On detection of scrambled binary 1 or 0 in the low channel at
+ *       1200 bit/s for 270 ± 40 ms: switch to transmitting scrambled
+ *       binary 1 at 1200 bit/s.
+ *   (c) After scrambled binary 1 has been transmitted for 765 ± 10 ms:
+ *       ready to transmit/receive data.
+ *
+ * This is event-driven, NOT time-scripted. USB1 continues indefinitely
+ * until (b) triggers. If the remote never shows up on the expected
+ * carrier within a hard timeout (we use 8 s), the handshake fails and
+ * we emit 'ready' with remoteDetected=false so the Handshake layer can
+ * report handshake-failed.
+ */
+
+const V22_HS_PHASE = Object.freeze({
+  INIT:     'init',
+  USB1:     'usb1',    // transmit unscrambled 1s, wait for scrambled from remote
+  SB1:      'sb1',     // transmit scrambled 1s for 765ms
+  DATA:     'data',    // ready for data
+});
+
+// Per spec §6.3.1.2.2(b): scrambled 1/0 must be detected for 270 ± 40 ms
+// in the remote's channel. "Detected" means we're really locked onto a
+// V.22 signal at the expected carrier, not just picking up any energy.
+//
+// We use the demodulator's running symbol magnitude as our indicator:
+// a real V.22 signal modulated at 1200 Hz carrier produces consistent
+// symbol magnitudes (~0.05+ measured in real captures) after the
+// matched filter; out-of-band junk (1800 Hz guard tone, line noise,
+// echo) falls way below that through the matched filter centered on
+// 1200 Hz.
+//
+// Threshold 0.02 leaves good margin: real signal ~0.05, junk well
+// below 0.01.
+const V22_REMOTE_MAG_THRESHOLD = 0.02;
+// V22_REMOTE_DETECT_MS: continuous detection duration required before
+// declaring remote detected. Spec §6.3.1.2.2(b) specifies 270 ± 40 ms,
+// which is the minimum a spec-compliant V.22 modem must wait. We use
+// 400 ms — an extra margin that gives robust rejection of V.32 Signal
+// AA teardown transients. When the calling modem gives up on V.32 (at
+// ~T+9s after no AC response) it goes silent then resumes at 1200 Hz
+// V.22 mode; during the brief teardown window, spectral ratios can
+// fluctuate. 400 ms ensures we only latch onto the modem's stable
+// post-V.32-fallback V.22 signal.
+const V22_REMOTE_DETECT_MS     = 400;
+// V.22 SB1 transmit duration.
+//
+// ITU V.22bis §6.3.1.2.2(c) specifies 765 ± 10 ms as the minimum. In
+// practice, real hardware modems may still be finalising their
+// receiver equalizer and timing-recovery loop beyond that window. If
+// we transition to DATA mode exactly at 765 ms and our upper layers
+// (TelnetProxy) attach and push bytes, those bytes arrive while the
+// modem's receiver is still converging — a "data too early" race
+// that can cause the modem to abort the handshake without ever
+// asserting Carrier Detect to its DTE.
+//
+// The line-level output of SB1 (scrambled binary 1 at 1200 bit/s)
+// and DATA-with-empty-queue (idle marking through the scrambler)
+// are IDENTICAL waveforms — the scrambler state is continuous across
+// the setMode() boundary. So extending SB1 beyond spec minimum is
+// transparent to the remote modem: it sees the same line signal it
+// would see during idle DATA anyway. The only difference is that
+// we hold off firing 'ready' (and thus TelnetProxy attachment) until
+// the extra dwell time has elapsed.
+//
+// 2000 ms gives the modem ~1.2 seconds of safety margin beyond the
+// 765 ms minimum.
+const V22_SB1_TX_MS            = 2000;  // spec min 765ms; extended for safety
+const V22_HANDSHAKE_TIMEOUT_MS = 8000;  // give up if remote never engages
+
+class V22 extends EventEmitter {
+  constructor(role) {
+    super();
+    this._role       = role;
+    const isAnswer   = role === 'answer';
+    const txCarrier  = isAnswer ? CARRIER_HIGH : CARRIER_LOW;
+    const rxCarrier  = isAnswer ? CARRIER_LOW  : CARRIER_HIGH;
+    this._rxCarrier  = rxCarrier;
+    this.modulator   = new QAMModulator({
+      carrier:       txCarrier,
+      bitsPerSymbol: 2,
+      // Guard tone at 1800 Hz is optional per ITU V.22bis §2.1 ("may
+      // be disabled as a national option"). We disable it because:
+      //   (a) North-American V.22 modems commonly don't use it
+      //   (b) 1800 Hz is exactly one V.22 symbol period away from
+      //       the 1200 Hz call-mode carrier, so it aliases through
+      //       the remote's matched filter and can confuse timing /
+      //       energy detectors in non-strict receivers
+      //   (c) Dropping it reduces transmit complexity without
+      //       changing the data-carrying signal
+      guardTone:     false,
+    });
+    this.demodulator = new QAMDemodulator({
+      carrier:       rxCarrier,
+      bitsPerSymbol: 2,
+    });
+    this.demodulator.on('data', buf => {
+      if (this._phase === V22_HS_PHASE.DATA) this.emit('data', buf);
+    });
+
+    this._phase              = V22_HS_PHASE.INIT;
+    this._phaseSamples       = 0;       // samples since current phase start
+    this._totalSamples       = 0;       // samples since handshake start
+
+    // Detection state
+    this._remoteMagAboveSamp = 0;       // consecutive samples mag > threshold
+    this._remoteDetected     = false;
+
+    // Listener-notification state (for the 'listening' event when we
+    // enter waiting-for-scrambled-response mode)
+    this._emittedListening   = false;
+  }
+
+  _enterPhase(phase) {
+    this._phase        = phase;
+    this._phaseSamples = 0;
+    switch (phase) {
+      case V22_HS_PHASE.USB1:
+        this.modulator.setMode('unscr-ones');
+        // We're now transmitting USB1 and listening for remote's scrambled
+        // signal. Signal "listening" to Handshake.js so it can log.
+        if (!this._emittedListening) {
+          this._emittedListening = true;
+          this.emit('listening', { phase: 'usb1' });
+        }
+        break;
+      case V22_HS_PHASE.SB1:
+        this.modulator.setMode('scr-ones');
+        break;
+      case V22_HS_PHASE.DATA:
+        this.modulator.setMode('data');
+        this.emit('ready', {
+          bps:            1200,
+          remoteDetected: this._remoteDetected,
+        });
+        break;
+    }
+  }
+
+  _advanceHandshake(n) {
+    if (this._phase === V22_HS_PHASE.INIT) {
+      this._enterPhase(V22_HS_PHASE.USB1);
+      return;
+    }
+    if (this._phase === V22_HS_PHASE.DATA) return;
+
+    this._phaseSamples += n;
+    this._totalSamples += n;
+
+    // Hard timeout: if remote never engages at all, abandon the handshake.
+    const totalMs = this._totalSamples * 1000 / SR;
+    if (!this._remoteDetected && totalMs >= V22_HANDSHAKE_TIMEOUT_MS) {
+      // Enter DATA phase with remoteDetected=false so Handshake.js
+      // reports handshake-failed instead of falsely claiming connected.
+      this._enterPhase(V22_HS_PHASE.DATA);
+      return;
+    }
+
+    if (this._phase === V22_HS_PHASE.USB1) {
+      // §6.3.1.2.2(b): switch to SB1 once remote has been detected for
+      // V22_REMOTE_DETECT_MS continuously.
+      if (this._remoteDetected) {
+        this._enterPhase(V22_HS_PHASE.SB1);
+      }
+      return;
+    }
+
+    if (this._phase === V22_HS_PHASE.SB1) {
+      // §6.3.1.2.2(c): transmit scrambled binary 1 for 765 ± 10 ms.
+      const sb1Samples = Math.round(V22_SB1_TX_MS * SR / 1000);
+      if (this._phaseSamples >= sb1Samples) {
+        this._enterPhase(V22_HS_PHASE.DATA);
+      }
+      return;
+    }
+  }
+
+  _trackRxDetection(samples) {
+    // Robust V.22 call-mode detector. Two independent tests must both
+    // pass before we declare remote-detected:
+    //
+    //   (1) Symbol magnitude from the demodulator's matched filter at
+    //       rxCarrier is above V22_REMOTE_MAG_THRESHOLD. Rules out
+    //       silence and low-level noise.
+    //
+    //   (2) Spectral shape matches V.22 call-mode: energy in a narrow
+    //       band around rxCarrier (1200 Hz for answer-side) exceeds
+    //       energy at 1800 Hz by a factor of 3 or more. This rejects
+    //       a specific false positive observed in real captures: the
+    //       modem transmits a 1800 Hz tone before/during its V.22
+    //       attempt. The matched filter at 1200 Hz is NOT sufficiently
+    // Detection strategy:
+    //
+    //   1. Spectral-shape test (carrier / ghost ratio):
+    //      the carrier-bin Goertzel must be at least 10× the 1800 Hz
+    //      ghost-bin Goertzel. This is the critical filter against
+    //      ITU-T V.32 Signal AA — a continuous 1800 Hz tone that
+    //      modern modems emit as the FIRST signal in "automode"
+    //      fallback when they hear a plain V.25 ANS tone (no V.8 AM
+    //      modulation). The AA segment lasts ~3 seconds while the
+    //      modem waits for V.32 response signal AC (600/3000 Hz). If
+    //      we don't answer, the modem gives up V.32, goes silent
+    //      briefly, and falls back to V.22 at 1200 Hz carrier.
+    //      During the AA phase, ghost energy dominates by ~3:1; during
+    //      real V.22 call-mode at 1200 Hz, carrier dominates by 10:1+.
+    //      A 10× threshold cleanly separates these regimes.
+    //
+    //   2. Minimum continuous duration: 400 ms. The real V.22 signal
+    //      is stable carrier + broadband modulation; the spectral
+    //      ratio holds steady. During V.32 AA teardown transients
+    //      the ratio can briefly touch 10:1 — the 400 ms window makes
+    //      us require a sustained real signal, not transient leakage.
+    //
+    //   3. Symbol magnitude threshold (existing): carrier-bin content
+    //      in the matched filter must be above the noise floor. This
+    //      rules out pure silence and very weak lines.
+    //
+    // Note: an absolute carrier-energy floor (e.g. > 0.05) was
+    // considered but rejected — the real V.22 signal on captures
+    // measures only ~0.013-0.018 at the carrier bin (because it's
+    // spread across the 600 Hz occupied band, not concentrated at
+    // a single frequency). An 0.05 floor would reject legitimate
+    // signal.
+    const mag = this.demodulator.symbolMag;
+    const detectSamples = Math.round(V22_REMOTE_DETECT_MS * SR / 1000);
+
+    // Running Goertzel at rxCarrier and 1800 Hz
+    this._goertzelRxCarrier(samples);
+    this._goertzelGhost(samples);
+    const carrierEnergy = this._carrierEnergy;
+    const ghostEnergy   = this._ghostEnergy;
+
+    // Spectral-shape test: carrier must dominate ghost by ≥3:1.
+    //
+    // On real captures:
+    //   - Real V.22 call-mode signal: ratio 3-9 (avg ~5)
+    //   - V.32 Signal AA (1800 Hz pure tone): ratio 0.2-0.5 (ghost dominates)
+    //   - V.32 AA teardown transients: brief ratio spikes toward 1-2
+    // A 3× threshold cleanly separates real V.22 from AA while still
+    // admitting the lower-ratio moments of real signal. The extended
+    // 400 ms continuous-detect window handles the brief teardown-
+    // transient false positives.
+    const spectralOK = carrierEnergy > 3 * (ghostEnergy + 0.001);
+    const magOK      = mag > V22_REMOTE_MAG_THRESHOLD;
+
+    // Periodic diagnostic trace (every 500ms) — helps us see the spectral
+    // shape evolution during the V.32 AA phase vs real V.22 phase, so
+    // we can understand why live detection differs from simulation.
+    // Gated on V32_DEBUG env var; zero cost when off.
+    if (process.env.V32_DEBUG && !this._remoteDetected) {
+      this._diagSampleCount = (this._diagSampleCount || 0) + samples.length;
+      if (this._diagSampleCount >= 4000) {   // every ~500ms
+        this._diagSampleCount = 0;
+        const totalMs = (this._totalSamples * 1000 / SR).toFixed(0);
+        process.stderr.write(
+          `[V22-SCAN ] t_V22local=${totalMs}ms ` +
+          `mag=${mag.toFixed(4)} ` +
+          `carrierE=${carrierEnergy.toFixed(4)} ` +
+          `ghostE=${ghostEnergy.toFixed(4)} ` +
+          `ratio=${(carrierEnergy / (ghostEnergy + 0.001)).toFixed(2)} ` +
+          `magOK=${magOK} specOK=${spectralOK} ` +
+          `above=${this._remoteMagAboveSamp || 0}\n`
+        );
+      }
+    }
+
+    if (magOK && spectralOK) {
+      this._remoteMagAboveSamp += samples.length;
+      if (!this._remoteDetected && this._remoteMagAboveSamp >= detectSamples) {
+        this._remoteDetected = true;
+        // Diagnostic dump at detection moment — helps diagnose live-vs-
+        // simulation discrepancies. Writes to stderr (which is captured
+        // to the V32_DEBUG log). Harmless in production; cheap to leave
+        // in place.
+        if (process.env.V32_DEBUG) {
+          const totalMs = (this._totalSamples * 1000 / SR).toFixed(0);
+          process.stderr.write(
+            `[V22-DETECT] t_V22local=${totalMs}ms ` +
+            `mag=${mag.toFixed(4)} ` +
+            `carrierE=${carrierEnergy.toFixed(4)} ` +
+            `ghostE=${ghostEnergy.toFixed(4)} ` +
+            `ratio=${(carrierEnergy / (ghostEnergy + 0.001)).toFixed(2)}\n`
+          );
+        }
+        this.emit('remote-detected', {
+          rms:            mag,
+          carrierEnergy:  carrierEnergy,
+          ghostEnergy:    ghostEnergy,
+        });
+      }
+    } else {
+      // Require continuous above-threshold. Any break resets.
+      this._remoteMagAboveSamp = 0;
+    }
+  }
+
+  /** Single-block Goertzel at rxCarrier (stateless — full block). */
+  _goertzelRxCarrier(samples) {
+    const f = this._rxCarrier;
+    const k = 2 * Math.PI * f / SR;
+    const c = 2 * Math.cos(k);
+    let s1 = 0, s2 = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const nw = samples[i] + c * s1 - s2;
+      s2 = s1; s1 = nw;
+    }
+    const mag = Math.sqrt(s1*s1 + s2*s2 - c*s1*s2) / samples.length;
+    // Smooth with running average
+    this._carrierEnergy = (this._carrierEnergy || 0) * 0.8 + mag * 0.2;
+  }
+
+  /** Single-block Goertzel at 1800 Hz (ghost tone band). */
+  _goertzelGhost(samples) {
+    const k = 2 * Math.PI * 1800 / SR;
+    const c = 2 * Math.cos(k);
+    let s1 = 0, s2 = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const nw = samples[i] + c * s1 - s2;
+      s2 = s1; s1 = nw;
+    }
+    const mag = Math.sqrt(s1*s1 + s2*s2 - c*s1*s2) / samples.length;
+    this._ghostEnergy = (this._ghostEnergy || 0) * 0.8 + mag * 0.2;
+  }
+
+  write(data)           { this.modulator.write(data); }
+  generateAudio(n)      { this._advanceHandshake(n); return this.modulator.generate(n); }
+  receiveAudio(samples) {
+    // Feed the demodulator first so symbolMag updates before we check it.
+    this.demodulator.process(samples);
+    this._trackRxDetection(samples);
+  }
+  reset() {
+    this.modulator.reset(); this.demodulator.reset();
+    this._phase              = V22_HS_PHASE.INIT;
+    this._phaseSamples       = 0;
+    this._totalSamples       = 0;
+    this._remoteMagAboveSamp = 0;
+    this._remoteDetected     = false;
+    this._emittedListening   = false;
+  }
+  get name()           { return 'V22'; }
+  get bps()            { return 1200; }
+  get phase()          { return this._phase; }
+  get ready()          { return this._phase === V22_HS_PHASE.DATA; }
+  get remoteDetected() { return this._remoteDetected; }
+  get rxEnergy()       { return this.demodulator.symbolMag; }
+}
+
+// ─── V.22bis handshake ─────────────────────────────────────────────────────
+
+/**
+ * Handshake state machine per ITU-T V.22bis §6.3.1.1.
+ *
+ * Event-driven per the spec. The V.22bis answer modem transmits
+ * unscrambled binary 1 (USB1) continuously, and only advances once
+ * the remote is detected. The remote's response determines whether
+ * we end up at 2400 bit/s (V.22bis) or fall back to 1200 bit/s (V.22).
+ *
+ * ANSWER side (§6.3.1.1.2):
+ *   (a) Transmit USB1 at 1200 bit/s, indefinitely.
+ *   (b) On detection of scrambled binary 1 or 0 in low channel for
+ *       270 ± 40 ms: fall back to V.22 (§6.3.1.2.2), i.e. transmit
+ *       scrambled binary 1 at 1200 bit/s for 765 ± 10 ms → DATA.
+ *       On detection of unscrambled S1 (double-dibit 00/11) from the
+ *       remote: transmit S1 ourselves for 100 ± 3 ms, then scrambled
+ *       binary 1 at 1200 bit/s.
+ *   (c) 600 ± 10 ms after circuit 112 on (i.e. 600 ms after we finish
+ *       our S1 transmission): begin transmitting scrambled binary 1
+ *       at 2400 bit/s.
+ *   (d) After 200 ± 10 ms at 2400 bit/s: ready for data.
+ *
+ * CALL side (§6.3.1.1.1): not yet implemented. When we add it, the
+ * call modem starts SILENT, listens for USB1 for 155 ± 10 ms, waits
+ * 456 ± 10 ms, then begins its own S1. The current implementation
+ * logs a warning and runs the answer flow — safe for our "answer-only"
+ * usage, wrong for future call-side support.
+ */
+
+const HS_PHASE = Object.freeze({
+  INIT:           'init',
+  // Answer-side phases:
+  USB1:           'usb1',          // transmit USB1, listen for remote response
+  S1_TX:          's1_tx',         // we detected remote S1, now transmit our S1
+  SB1_LOW:        'sb1_low',       // scrambled 1 at 1200 bit/s (low bps)
+  SB1_HIGH:       'sb1_high',      // scrambled 1 at 2400 bit/s
+  // V.22 fallback phase (we only detected scrambled 1/0, not S1):
+  V22_FALLBACK_SB1: 'v22_fallback_sb1',
+  // Terminal:
+  DATA:           'data',
+});
+
+// Phase durations (ms) — fixed where the spec says so, otherwise
+// event-driven.
+const HS_DURATION = {
+  S1_TX:             100,    // §6.3.1.1.2(b): S1 for 100 ± 3 ms
+  POST_S1_SB1_LOW:   600,    // §6.3.1.1.2(c): 600 ± 10 ms of scrambled 1 @1200
+  SB1_HIGH:          200,    // §6.3.1.1.2(d): 200 ± 10 ms of scrambled 1 @2400
+  // Extended to 2000 ms for the same reason V22_SB1_TX_MS is — gives
+  // real modems time to complete training before we fire 'ready'.
+  // Spec min 765 ms; 2000 ms is line-identical because scrambled-1
+  // SB1 and DATA-idle emit the same scrambled-bit waveform.
+  V22_FALLBACK_SB1:  2000,
+};
+
+// V.22bis detection uses the same narrowband / spectral-shape approach
+// as V.22. See V22 class for detailed rationale.
+const V22BIS_REMOTE_MAG_THRESHOLD = 0.02;
+// V22BIS_REMOTE_DETECT_MS: match V22_REMOTE_DETECT_MS (400 ms) — see
+// its comment for rationale (V.32 Signal AA teardown transient
+// rejection).
+const V22BIS_REMOTE_DETECT_MS     = 400;
+const V22BIS_HANDSHAKE_TIMEOUT_MS = 8000;
+
+// S1 detection threshold (smoothed Goertzel magnitude at lower S1
+// sideband = rxCarrier - baud/2). Empirically on a clean mod→demod
+// loopback:
+//   S1 at rxCarrier=1200:           ~0.038 at 900 Hz
+//   Scrambled-1 at rxCarrier:       ~0.019 at 900 Hz (random content
+//                                   leaks into the 900 Hz bin)
+//   USB1 at rxCarrier:              ~0.001 at 900 Hz
+// Threshold 0.025 cleanly separates S1 from SB1 with ~4 dB margin
+// either direction.
+const V22BIS_S1_SIDEBAND_THRESHOLD = 0.025;
+
+/**
+ * V.22bis protocol with handshake.
+ *
+ * Exposes the same interface as other protocols:
+ *   - generateAudio(n) → Float32Array
+ *   - receiveAudio(samples)
+ *   - write(bytes)            (only valid once 'ready' has fired)
+ *   - 'data' event            (from demodulator, post-ready)
+ *   - 'ready' event           (handshake complete)
+ */
+class V22bis extends EventEmitter {
+  constructor(role) {
+    super();
+    this._role       = role;
+    if (role !== 'answer') {
+      // Not yet implemented — see class JSDoc. For now, running the
+      // answer-side flow. When call-side is added, dispatch here.
+      // TODO(call-side): implement per §6.3.1.1.1.
+    }
+    const isAnswer   = role === 'answer';
+    const txCarrier  = isAnswer ? CARRIER_HIGH : CARRIER_LOW;
+    const rxCarrier  = isAnswer ? CARRIER_LOW  : CARRIER_HIGH;
+    this._rxCarrier  = rxCarrier;
+    this.modulator   = new QAMModulator({
+      carrier:       txCarrier,
+      bitsPerSymbol: 2,            // start at V.22 rate during handshake
+      // Guard tone disabled — see V22 class constructor for rationale.
+      guardTone:     false,
+    });
+    this.demodulator = new QAMDemodulator({
+      carrier:       rxCarrier,
+      bitsPerSymbol: 2,            // demod also starts at V.22 rate
+    });
+    this.demodulator.on('data', buf => {
+      // During handshake, discard decoded bytes (they're just training
+      // patterns). Only forward once DATA phase is reached.
+      if (this._phase === HS_PHASE.DATA) this.emit('data', buf);
+    });
+
+    // Handshake state
+    this._phase               = HS_PHASE.INIT;
+    this._phaseSamples        = 0;        // samples elapsed in current phase
+    this._totalSamples        = 0;        // samples since handshake start
+
+    // Remote detection state
+    this._remoteMagAboveSamp  = 0;
+    this._remoteDetected      = false;
+    this._emittedListening    = false;
+
+    // Negotiated data rate — set when we decide which flow to take.
+    // 1200 for V.22 fallback, 2400 for V.22bis.
+    this._negotiatedBps       = 1200;
+  }
+
+  _enterPhase(phase) {
+    this._phase        = phase;
+    this._phaseSamples = 0;
+    switch (phase) {
+      case HS_PHASE.USB1:
+        this.modulator.setBitsPerSymbol(2);
+        this.modulator.setMode('unscr-ones');
+        if (!this._emittedListening) {
+          this._emittedListening = true;
+          this.emit('listening', { phase: 'usb1' });
+        }
+        break;
+      case HS_PHASE.S1_TX:
+        this.modulator.setBitsPerSymbol(2);
+        this.modulator.setMode('alt-00-11');
+        break;
+      case HS_PHASE.SB1_LOW:
+        this.modulator.setBitsPerSymbol(2);
+        this.modulator.setMode('scr-ones');
+        break;
+      case HS_PHASE.SB1_HIGH:
+        this.modulator.setBitsPerSymbol(4);
+        this.demodulator._bps = 4;
+        this.modulator.setMode('scr-ones');
+        break;
+      case HS_PHASE.V22_FALLBACK_SB1:
+        // V.22 fallback: we detected scrambled 1/0 not S1, so the
+        // remote is V.22-only or using the 1200-bit/s fallback flow.
+        // Transmit SB1 at 1200 bit/s for 765 ± 10 ms.
+        this.modulator.setBitsPerSymbol(2);
+        this.modulator.setMode('scr-ones');
+        this._negotiatedBps = 1200;
+        break;
+      case HS_PHASE.DATA:
+        this.modulator.setBitsPerSymbol(this._negotiatedBps === 2400 ? 4 : 2);
+        this.demodulator._bps = this._negotiatedBps === 2400 ? 4 : 2;
+        this.modulator.setMode('data');
+        this.emit('ready', {
+          bps:            this._negotiatedBps,
+          remoteDetected: this._remoteDetected,
+        });
+        break;
+    }
+  }
+
+  _advanceHandshake(n) {
+    if (this._phase === HS_PHASE.INIT) {
+      this._enterPhase(HS_PHASE.USB1);
+      return;
+    }
+    if (this._phase === HS_PHASE.DATA) return;
+
+    this._phaseSamples += n;
+    this._totalSamples += n;
+
+    // Hard timeout: if remote never shows up, abandon the handshake.
+    const totalMs = this._totalSamples * 1000 / SR;
+    if (!this._remoteDetected && totalMs >= V22BIS_HANDSHAKE_TIMEOUT_MS) {
+      // Enter DATA with remoteDetected=false so Handshake.js reports
+      // handshake-failed instead of falsely claiming connected.
+      this._enterPhase(HS_PHASE.DATA);
+      return;
+    }
+
+    switch (this._phase) {
+      case HS_PHASE.USB1: {
+        // §6.3.1.1.2(b): when remote is detected we choose between
+        // two paths based on what we're seeing on the line:
+        //
+        //   - S1 pattern (unscrambled double-dibit 00/11 → phase
+        //     quadrant deltas alternate between +90° and +270°):
+        //     the caller is V.22bis-capable and is offering the
+        //     2400-bit/s negotiation. We respond with our own S1
+        //     for 100 ± 3 ms, then SB1_LOW (scrambled 1 @1200bps)
+        //     for 600 ± 10 ms, then SB1_HIGH (scrambled 1 @2400bps)
+        //     for 200 ± 10 ms, then DATA at 2400 bit/s.
+        //
+        //   - Scrambled binary 1/0 (pseudo-random phase deltas):
+        //     the caller is either V.22-only or has fallen back to
+        //     the V.22 1200-bit/s flow. We just transmit SB1 at
+        //     1200 bit/s for the duration then enter DATA at 1200.
+        //
+        // The caller per §6.3.1.1.1(b) transmits S1 for only 100 ms
+        // before moving to SB1, so we must detect S1 quickly — we
+        // check the dQuad history every block while in USB1.
+        if (this._remoteDetected) {
+          if (this._detectS1()) {
+            this._enterPhase(HS_PHASE.S1_TX);
+          } else {
+            this._enterPhase(HS_PHASE.V22_FALLBACK_SB1);
+          }
+        }
+        return;
+      }
+      case HS_PHASE.V22_FALLBACK_SB1: {
+        // §6.3.1.2.2(c): SB1 for 765 ± 10 ms then DATA at 1200 bit/s.
+        const durSamples = Math.round(HS_DURATION.V22_FALLBACK_SB1 * SR / 1000);
+        if (this._phaseSamples >= durSamples) {
+          this._negotiatedBps = 1200;
+          this._enterPhase(HS_PHASE.DATA);
+        }
+        return;
+      }
+      case HS_PHASE.S1_TX: {
+        // §6.3.1.1.2(b): S1 for 100 ± 3 ms.
+        const durSamples = Math.round(HS_DURATION.S1_TX * SR / 1000);
+        if (this._phaseSamples >= durSamples) {
+          this._enterPhase(HS_PHASE.SB1_LOW);
+        }
+        return;
+      }
+      case HS_PHASE.SB1_LOW: {
+        // §6.3.1.1.2(c): 600 ± 10 ms at 1200 bit/s scrambled, then 2400.
+        const durSamples = Math.round(HS_DURATION.POST_S1_SB1_LOW * SR / 1000);
+        if (this._phaseSamples >= durSamples) {
+          this._enterPhase(HS_PHASE.SB1_HIGH);
+        }
+        return;
+      }
+      case HS_PHASE.SB1_HIGH: {
+        // §6.3.1.1.2(d): 200 ± 10 ms at 2400 bit/s, then DATA.
+        const durSamples = Math.round(HS_DURATION.SB1_HIGH * SR / 1000);
+        if (this._phaseSamples >= durSamples) {
+          this._negotiatedBps = 2400;
+          this._enterPhase(HS_PHASE.DATA);
+        }
+        return;
+      }
+    }
+  }
+
+  /**
+   * Detect S1 pattern in the incoming RX signal.
+   *
+   * S1 (unscrambled double-dibit 00/11 at 600 baud) has a distinctive
+   * spectral signature at the low channel 1200 Hz carrier:
+   *   - Strong tone at 1200 Hz (the carrier)
+   *   - Strong sidebands at 900 Hz and 1500 Hz (carrier ± baud/2)
+   *
+   * Contrast:
+   *   - Scrambled 1 (SB1): broad random spectrum. Some energy leaks
+   *     into the 900 Hz bin but at lower level than S1.
+   *   - Unscrambled 1 (USB1): single peak at ~1050 Hz (carrier - 150
+   *     Hz = baud/4 shift). Near-zero at 900 Hz.
+   *
+   * We detect S1 by running a Goertzel at rxCarrier - baud/2 (900 Hz
+   * for answer role) and checking if its smoothed magnitude exceeds
+   * V22BIS_S1_SIDEBAND_THRESHOLD. See that constant for tuning notes.
+   *
+   * This bypasses the demodulator's phase-delta path entirely — it's
+   * a pure RF-level spectral test, which is what we need because our
+   * QAM demodulator's symbol-timing alignment isn't clean enough to
+   * reliably recover individual dibit phase changes.
+   */
+  _detectS1() {
+    const e = this._s1SidebandEnergy || 0;
+    return e > V22BIS_S1_SIDEBAND_THRESHOLD;
+  }
+
+  _trackRxDetection(samples) {
+    // Identical logic to V22._trackRxDetection — see there for
+    // rationale. Using two tests (constellation magnitude AND spectral
+    // shape) to reject the 1800 Hz phantom tone that matched filters
+    // at 1200 Hz would otherwise alias through.
+    const mag = this.demodulator.symbolMag;
+    const detectSamples = Math.round(V22BIS_REMOTE_DETECT_MS * SR / 1000);
+
+    this._goertzelRxCarrier(samples);
+    this._goertzelGhost(samples);
+    // Also track the S1 lower sideband so _detectS1() can distinguish
+    // a V.22bis S1 signal from V.22 SB1 at detection time.
+    this._goertzelS1Sideband(samples);
+    const carrierEnergy = this._carrierEnergy || 0;
+    const ghostEnergy   = this._ghostEnergy   || 0;
+
+    // Spectral-shape test: same 3× threshold as V22 class. See
+    // V22._trackRxDetection for the empirical tuning rationale
+    // (V.32 Signal AA rejection).
+    const spectralOK = carrierEnergy > 3 * (ghostEnergy + 0.001);
+    const magOK      = mag > V22BIS_REMOTE_MAG_THRESHOLD;
+
+    if (magOK && spectralOK) {
+      this._remoteMagAboveSamp += samples.length;
+      if (!this._remoteDetected && this._remoteMagAboveSamp >= detectSamples) {
+        this._remoteDetected = true;
+        this.emit('remote-detected', {
+          rms:           mag,
+          carrierEnergy: carrierEnergy,
+          ghostEnergy:   ghostEnergy,
+          s1Sideband:    this._s1SidebandEnergy || 0,
+        });
+      }
+    } else {
+      this._remoteMagAboveSamp = 0;
+    }
+  }
+
+  _goertzelRxCarrier(samples) {
+    const f = this._rxCarrier;
+    const k = 2 * Math.PI * f / SR;
+    const c = 2 * Math.cos(k);
+    let s1 = 0, s2 = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const nw = samples[i] + c * s1 - s2;
+      s2 = s1; s1 = nw;
+    }
+    const mag = Math.sqrt(s1*s1 + s2*s2 - c*s1*s2) / samples.length;
+    this._carrierEnergy = (this._carrierEnergy || 0) * 0.8 + mag * 0.2;
+  }
+
+  _goertzelGhost(samples) {
+    const k = 2 * Math.PI * 1800 / SR;
+    const c = 2 * Math.cos(k);
+    let s1 = 0, s2 = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const nw = samples[i] + c * s1 - s2;
+      s2 = s1; s1 = nw;
+    }
+    const mag = Math.sqrt(s1*s1 + s2*s2 - c*s1*s2) / samples.length;
+    this._ghostEnergy = (this._ghostEnergy || 0) * 0.8 + mag * 0.2;
+  }
+
+  /** Goertzel at the S1 lower sideband: rxCarrier - baud/2.
+   *  Answer (rxCarrier=1200) → 900 Hz. Call (rxCarrier=2400) → 2100 Hz.
+   *  S1 (unscrambled double-dibit 00/11 at 600 baud) has strong energy
+   *  at this frequency; scrambled-1 and USB1 do not. See V22BIS_S1_
+   *  SIDEBAND_THRESHOLD comment for empirical measurements. */
+  _goertzelS1Sideband(samples) {
+    const f = this._rxCarrier - BAUD / 2;
+    const k = 2 * Math.PI * f / SR;
+    const c = 2 * Math.cos(k);
+    let s1 = 0, s2 = 0;
+    for (let i = 0; i < samples.length; i++) {
+      const nw = samples[i] + c * s1 - s2;
+      s2 = s1; s1 = nw;
+    }
+    const mag = Math.sqrt(s1*s1 + s2*s2 - c*s1*s2) / samples.length;
+    this._s1SidebandEnergy = (this._s1SidebandEnergy || 0) * 0.8 + mag * 0.2;
+  }
+
+  write(data) { this.modulator.write(data); }
+
+  generateAudio(n) {
+    this._advanceHandshake(n);
+    return this.modulator.generate(n);
+  }
+
+  receiveAudio(samples) {
+    // Feed demodulator first so symbolMag updates before detection.
+    this.demodulator.process(samples);
+    this._trackRxDetection(samples);
+  }
+
+  reset() {
+    this.modulator.reset();
+    this.demodulator.reset();
+    this._phase              = HS_PHASE.INIT;
+    this._phaseSamples       = 0;
+    this._totalSamples       = 0;
+    this._remoteMagAboveSamp = 0;
+    this._remoteDetected     = false;
+    this._emittedListening   = false;
+    this._negotiatedBps      = 1200;
+    this._carrierEnergy      = 0;
+    this._ghostEnergy        = 0;
+    this._s1SidebandEnergy   = 0;
+  }
+
+  get name()           { return 'V22bis'; }
+  get bps()            { return this._negotiatedBps; }
+  get phase()          { return this._phase; }
+  get ready()          { return this._phase === HS_PHASE.DATA; }
+  get remoteDetected() { return this._remoteDetected; }
+  get rxEnergy()       { return this.demodulator.symbolMag; }
+}
+
+module.exports = {
+  V22, V22bis,
+  QAMModulator, QAMDemodulator,
+  V22Scrambler,
+  HS_PHASE, HS_DURATION,
+  // Useful constants and helpers for tests and other modules:
+  CARRIER_LOW, CARRIER_HIGH, BAUD, SPS, PEAK_TARGET, GUARD_FREQ,
+  PHASE_CHANGE, QUADRANT_POINT,
+  rrcImpulse, buildRrcTaps, RRC,
+  mapSymbol,
+};

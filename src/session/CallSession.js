@@ -134,32 +134,102 @@ class CallSession extends EventEmitter {
   // ─── Modem data path ─────────────────────────────────────────────────────────
 
   _onModemConnected() {
-    log.info(`[${this._id}] Modem handshake complete — waiting for remote to settle`);
+    log.info(`[${this._id}] Modem handshake complete — holding post-train idle`);
 
-    // DSP data → telnet proxy (connect receive side immediately so we
-    // don't lose any early bytes from the remote).
-    this._dsp.on('data', buf => this._telnet.receive(buf));
+    // Post-training "V.42 Penalty Box" — after V.22 training completes,
+    // most modern modems spend some seconds transmitting V.42 ODP trying
+    // to negotiate LAPM error correction. synthmodem doesn't implement
+    // V.42, so we must wait that window out without sending any payload
+    // bytes (which would corrupt the caller's descrambler and cause it
+    // to refuse DCD) and without routing the descrambled ODP garbage to
+    // TelnetProxy (the menu would interpret the bytes as hostnames).
+    //
+    // Strategy: two-phase wait.
+    //
+    //   Phase 1 — MINIMUM HOLD: wait config.modem.postTrainIdleMs
+    //   (default 6000 ms) unconditionally. This covers the V.22
+    //   §6.3.1.2.2 tail and the typical V.42 T400 timers observed in
+    //   consumer modems (4-6 s). Smaller values (3-4 s) caused some
+    //   modems to drop the call when banner bytes arrived mid-V.42.
+    //
+    //   Phase 2 — QUIESCENCE WAIT: after the minimum hold, keep the
+    //   TelnetProxy detached as long as RX bytes keep arriving. When the
+    //   byte stream goes quiet for QUIESCENCE_MS (caller has finished
+    //   V.42 and dropped into mark idle, which our binding suppresses
+    //   as 0xFF), attach the TelnetProxy. Hard cap at ATTACH_MAX_MS from
+    //   training-complete to avoid waiting forever on pathological modems.
+    //
+    // During both phases, RX bytes are counted for quiescence tracking
+    // but NOT routed anywhere — they're silently discarded.
+    const holdMs        = (config.modem.postTrainIdleMs    ?? 3000);
+    const quiescenceMs  = (config.modem.postTrainQuiescenceMs ?? 500);
+    const attachMaxMs   = (config.modem.postTrainAttachMaxMs  ?? 10000);
 
-    // Give the remote modem time to finish its own handshake / lock
-    // carrier detect / initialise its UART framer before we blast data
-    // into the new connection. Banner bytes that arrive during the
-    // remote's CD-acquisition window are lost — a settle delay avoids
-    // that at the cost of a brief pause before the user sees our banner.
-    // 500 ms is conservative; most modems lock in ≤ 200 ms, but some
-    // older ones take up to 300 ms after their own training completes.
-    setTimeout(() => {
-      if (!this._active) return;
-      log.info(`[${this._id}] Attaching TelnetProxy`);
+    log.debug(`[${this._id}] Post-train hold: minimum ${holdMs}ms, then wait ${quiescenceMs}ms quiescence (cap ${attachMaxMs}ms)`);
 
-      // Telnet proxy output → DSP (→ RTP)
+    const startedAt = Date.now();
+    let lastByteAt  = startedAt;
+    let droppedCount = 0;
+    let minHoldElapsed = false;
+    let attached = false;
+
+    // Temporary RX sink — counts bytes for quiescence tracking but
+    // discards them.
+    const rxSink = (buf) => {
+      if (attached) return;          // real path is active now
+      lastByteAt = Date.now();
+      droppedCount += buf.length;
+    };
+    this._dsp.on('data', rxSink);
+
+    const attach = (reason) => {
+      if (attached || !this._active) return;
+      attached = true;
+      this._dsp.off('data', rxSink);
+      const waited = Date.now() - startedAt;
+      log.info(`[${this._id}] Post-train hold complete — attaching TelnetProxy (${reason}, waited ${waited}ms, dropped ${droppedCount} bytes)`);
+
+      // DSP data → TelnetProxy — bytes from here onwards are real user input.
+      this._dsp.on('data', buf => this._telnet.receive(buf));
+
+      // TelnetProxy output → DSP.
       this._telnet.attach(buf => this._dsp.write(buf));
 
-      // Telnet proxy requests disconnect
+      // TelnetProxy requests disconnect.
       this._telnet.on('disconnect', () => {
         log.info(`[${this._id}] User disconnected via terminal`);
         this.hangup('user');
       });
-    }, 500);
+    };
+
+    // Phase 1: min hold timer.
+    setTimeout(() => {
+      if (!this._active) return;
+      minHoldElapsed = true;
+      // If there's been no byte activity during the min hold at all, we
+      // can attach right away — nothing in flight.
+      if (Date.now() - lastByteAt >= quiescenceMs) {
+        attach('quiet from start');
+      }
+    }, holdMs);
+
+    // Phase 2: periodic quiescence check.
+    const tick = setInterval(() => {
+      if (!this._active || attached) {
+        clearInterval(tick);
+        return;
+      }
+      const now = Date.now();
+      if (now - startedAt >= attachMaxMs) {
+        clearInterval(tick);
+        attach('attach_max reached');
+        return;
+      }
+      if (minHoldElapsed && now - lastByteAt >= quiescenceMs) {
+        clearInterval(tick);
+        attach('quiescence');
+      }
+    }, 100);
   }
 
   // ─── Hangup ───────────────────────────────────────────────────────────────────

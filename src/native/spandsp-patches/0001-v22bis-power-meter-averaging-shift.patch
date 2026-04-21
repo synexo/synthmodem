@@ -1,0 +1,47 @@
+From: synthmodem vendor
+Subject: [PATCH] v22bis: increase rx power meter averaging shift from 5 to 9
+
+The V.22bis RX carrier detector feeds the real part of the narrowband
+RRC-filtered signal into a power meter that uses shift=5 -- i.e. a
+~4ms (32-sample at 8kHz) exponentially-weighted average. With real
+phone-line audio (particularly PCMU-decoded samples from a SIP call),
+the filter envelope naturally dips near zero at QAM symbol
+transitions, and 4ms of averaging is not enough to smooth those dips.
+
+The observed rx_power.reading oscillates between ~900 and ~60000,
+straddling the default carrier_off_power threshold of 955. Each dip
+below that threshold calls v22bis_restart(), a full modem reset that
+wipes tx.training back to INITIAL_TIMED_SILENCE.
+
+On real modem connections this fires dozens of times per second and
+causes V.22 training to fail permanently (TX goes silent within ~600ms
+of first signaling, then the state machine never recovers).
+
+Changing shift to 9 gives ~64ms averaging, which is:
+  - slow enough to smooth the QAM envelope dips completely
+  - fast enough to still detect a genuine carrier-loss within 100ms
+
+Tested against a captured real-modem V.22 answer session: training
+succeeds in ~1s, zero spurious restarts, 491 bytes decoded off the
+line in an 8s window (vs zero before the patch).
+
+--- a/src/v22bis_rx.c
++++ b/src/v22bis_rx.c
+@@ -1020,7 +1020,16 @@ int v22bis_rx_restart(v22bis_state_t *s)
+
+     s->rx.carrier_phase_rate = (s->calling_party)  ?  DDS_PHASE_RATE(HIGH_CARRIER_FREQUENCY)  :  DDS_PHASE_RATE(LOW_CARRIER_FREQUENCY);
+     s->rx.carrier_phase = 0;
+-    power_meter_init(&s->rx.rx_power, 5);
++    /* synthmodem patch: shift was 5 (~4ms averaging at 8kHz), which left
++       the power reading oscillating within the carrier hysteresis band for
++       the narrowband-filtered QAM envelope. Any dip below carrier_off_power
++       (~955 with default -45.5 dBm0 cutoff) triggers v22bis_restart() -- a
++       full modem reset that wipes tx.training back to INITIAL_TIMED_SILENCE.
++       On real modem audio fed through PCMU decode, this fires dozens of
++       times per second and causes training to fail permanently.
++       Shift=9 gives ~64ms averaging -- stable across symbol transitions,
++       fast enough to still detect real carrier-off in <100ms. */
++    power_meter_init(&s->rx.rx_power, 9);
+     v22bis_rx_set_signal_cutoff(s, -45.5f);
+ #if defined(SPANDSP_USE_FIXED_POINT)
+     s->rx.agc_scaling = (float) (1024.0f*1024.0f)*0.0005f*0.025f;

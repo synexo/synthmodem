@@ -7,7 +7,7 @@ Physical Modem ──► SIP Gateway ──► SynthModem ──► Telnet Host
   (e.g. V.34)      (e.g. SPA2102)   (this software)   (TCP)
 ```
 
-All modem DSP (modulation, demodulation, carrier recovery, timing) is implemented natively in Node.js with no external DSP tools or native addons required.
+All modem DSP (modulation, demodulation, carrier recovery, timing) is implemented in Node.js. V.21 is implemented in pure JavaScript. V.22 and V.22bis are implemented via a compiled native addon (`src/native/`) that wraps a vendored subset of [SpanDSP](https://github.com/freeswitch/spandsp) — no external DSP library is required at runtime; SpanDSP sources are vendored into this repository and built as part of `npm install`.
 
 ---
 
@@ -15,7 +15,7 @@ All modem DSP (modulation, demodulation, carrier recovery, timing) is implemente
 
 - **SIP server** — UDP and TCP, handles INVITE / ACK / BYE / CANCEL / OPTIONS
 - **RTP audio** — G.711 µ-law (PCMU) and A-law (PCMA), jitter buffer
-- **Modem protocols** — V.21 (300 bps), V.22 (1200 bps), V.22bis (2400 bps), V.23 (1200/75 bps), V.32bis (14400 bps), V.34 (14400 bps cap)
+- **Modem protocols** — V.21 (300 bps, JavaScript), V.22 (1200 bps, native), V.22bis (2400 bps, native), V.23 (1200/75 bps), V.32bis (14400 bps), V.34 (14400 bps cap)
 - **V.8 negotiation** — ANSam tone, CI/JM/CM exchange, automatic protocol selection
 - **Telnet proxy** — terminal menu, host:port input, bidirectional TCP proxy, Telnet option negotiation (ECHO, SGA, NAWS, TTYPE)
 - **Test client** — SIP UAC + virtual originating modem + optional speaker audio output
@@ -26,7 +26,10 @@ All modem DSP (modulation, demodulation, carrier recovery, timing) is implemente
 ## Requirements
 
 - Node.js 16 or later
-- No native build tools required for core operation
+- C/C++ compiler (required for `npm install` to build the V.22/V.22bis native addon):
+  - **Linux**: `sudo apt install build-essential`
+  - **macOS**: Xcode command-line tools (`xcode-select --install`)
+  - **Windows**: Visual Studio Build Tools (C++ workload)
 - Optional: `speaker` npm package for audio output in the test client
 
 ---

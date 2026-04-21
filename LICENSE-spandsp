@@ -1,0 +1,96 @@
+SynthModem — Vendored SpanDSP
+==============================================================================
+
+The directory `src/native/spandsp/` contains a subset of SpanDSP, a free
+software DSP library written by Steve Underwood. SpanDSP is Copyright
+© Steve Underwood and licensed under the GNU Lesser General Public
+License, version 2.1 (LGPL-2.1).
+
+Upstream:   https://github.com/freeswitch/spandsp
+Vendored from commit: 797760168945c96e91af55bde9d4edaea2e654f9  (2025-07-07)
+
+What is vendored
+----------------
+Only the subset needed for V.22 / V.22bis modem support:
+
+  src/native/spandsp/src/
+    alloc.c                     complex_vector_int.c    power_meter.c
+    async.c                     dds_float.c             tone_detect.c
+    bit_operations.c            dds_int.c               v22bis_rx.c
+    complex_vector_float.c      logging.c               v22bis_tx.c
+                                                        vector_float.c
+                                                        vector_int.c
+
+    floating_fudge.h                filter_tools.h
+    mmx_sse_decs.h
+
+  src/native/spandsp/src/spandsp/      — SpanDSP public headers
+  src/native/spandsp/src/spandsp/private/ — SpanDSP private headers
+
+The T.30, T.38, and fax modules are NOT vendored. The V.27ter, V.29, V.17,
+V.32bis, V.34, and V.8 modules are NOT vendored.
+
+Generated files
+---------------
+The following files were generated at integration time by running SpanDSP's
+`make_modem_filter` tool against this commit's source:
+
+  src/native/spandsp/src/v22bis_tx_rrc.h       (from: make_modem_filter -m V.22bis -t)
+  src/native/spandsp/src/v22bis_rx_1200_rrc.h  (from: make_modem_filter -m V.22bis1200 -r)
+  src/native/spandsp/src/v22bis_rx_2400_rrc.h  (from: make_modem_filter -m V.22bis2400 -r)
+
+These files contain pulse-shaping filter coefficients; they are pure data
+and carry the same LGPL-2.1 license as the rest of SpanDSP.
+
+Local modifications
+-------------------
+The vendored SpanDSP files themselves are unmodified from upstream. A
+hand-written configuration file has been added:
+
+  src/native/spandsp/config.h
+
+This file supplies the HAVE_* capability macros that SpanDSP normally gets
+from an autotools-generated config.h. It does not modify any SpanDSP code.
+
+License
+-------
+The full text of the LGPL-2.1 license as distributed with SpanDSP is
+reproduced below. SynthModem itself remains under the MIT license (see
+LICENSE); the vendored SpanDSP code and its derivatives (the compiled
+.node addon) are under LGPL-2.1.
+
+==============================================================================
+
+GNU LESSER GENERAL PUBLIC LICENSE
+Version 2.1, February 1999
+
+Copyright (C) 1991, 1999 Free Software Foundation, Inc.
+51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
+
+[This is the first released version of the Lesser GPL.  It also counts
+ as the successor of the GNU Library Public License, version 2, hence
+ the version number 2.1.]
+
+Preamble
+
+  The licenses for most software are designed to take away your freedom
+to share and change it.  By contrast, the GNU General Public Licenses
+are intended to guarantee your freedom to share and change free
+software--to make sure the software is free for all its users.
+
+  This license, the Lesser General Public License, applies to some
+specially designated software packages--typically libraries--of the
+Free Software Foundation and other authors who decide to use it.  You
+can use it too, but we suggest you first think carefully about whether
+this license or the ordinary General Public License is the better
+strategy to use in any particular case, based on the explanations below.
+
+  ...
+
+[The full text of LGPL-2.1 is available at:
+  https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+ and in the SpanDSP source tree as the file COPYING.]
+
+==============================================================================
