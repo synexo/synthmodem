@@ -1,6 +1,6 @@
 # SynthModem — In-VM PJSIP Integration (Option B, B2BUA)
 
-This document sketches a path to replace our hand-rolled shim↔slmodemd
+This document sketches a path to add an additional option to our hand-rolled shim↔slmodemd
 audio interface with the D-Modem reference implementation, running
 inside our existing VM. The goal is to inherit D-Modem's proven
 reliability (days-long modem stability, per their README) without
@@ -9,7 +9,7 @@ exposing the VM to external SIP traffic.
 ## The idea in one paragraph
 
 Node continues to terminate external SIP calls exactly as it does
-today. For the slmodemd backend only, Node additionally acts as a
+today. For the slmodemd-pjsip backend only, Node additionally acts as a
 B2BUA (back-to-back user agent) that establishes a second, internal
 SIP call leg to a PJSIP instance running inside the VM. PJSIP inside
 the VM then drives slmodemd via D-Modem's unchanged `d-modem.c`.
@@ -129,18 +129,6 @@ input.
 - **d-modem.c** — unchanged from D-Modem upstream. It's the PJSIP
   media port that bridges to slmodemd's socketpair.
 - **slmodemd** — unchanged. Same binary we ship today.
-
-### What goes away
-
-- The current shim's **audio-forwarding path** (`handle_host_audio_readable`
-  writing PCM to the socketpair). PJSIP now drives the socketpair
-  directly via d-modem.c.
-- The current shim's **pump_start/pump_stop/pump_active** lifecycle
-  (failed anyway).
-- The current shim's **ATA / NO CARRIER / HANGUP triggers**.
-- Node's **RTP decode-for-DSP path** for the slmodemd backend.
-  Decode still happens for TX audio capture (if enabled) but PJSIP
-  handles the modem-facing side.
 
 ### What stays
 
@@ -347,9 +335,9 @@ the next one.
 They pin 2.15.1. We stay with that. Upstream PJSIP may be further
 along but we want the known-good one.
 
-## What this would replace vs what it would add
+## What this would changes (in new slmodemd-pjsip) vs what it would add
 
-**Replaces**:
+**Changes**:
 - The audio side of `vm/shim/modemd-shim.c` (`handle_host_audio_readable`,
   `handle_slm_audio_readable`, plus all the pump/gating logic that
   failed)
