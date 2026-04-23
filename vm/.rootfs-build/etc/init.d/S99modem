@@ -1,0 +1,176 @@
+#!/bin/sh
+#
+# /etc/init.d/S99modem — start slmodemd + modemd-shim inside the VM.
+#
+# Init flow (driven by /etc/inittab):
+#   1. ::sysinit:/etc/init.d/rcS runs first and mounts /proc, /sys,
+#      /dev, /dev/pts, /tmp. sysinit entries complete before any
+#      respawn entries fire, so we can assume those mounts exist.
+#   2. ttyS0::respawn:/etc/init.d/S99modem (this script) runs on the
+#      serial console, so slmodemd's stdout/stderr lands where QEMU
+#      captures it and the Node runner can read boot diagnostics.
+#
+# This script's job:
+#   a. Load the virtio kernel modules (Debian's i386 kernel ships
+#      them CONFIG_VIRTIO_*=m). Without these, virtio-serial ports
+#      never appear.
+#   b. Enumerate /sys/class/virtio-ports/vport*/name and create
+#      /dev/virtio-ports/<name> symlinks by hand. udev/mdev would
+#      normally do this; we don't ship either, so we do it ourselves.
+#   c. Exec slmodemd with -e pointing at modemd-shim. slmodemd
+#      creates /dev/ttySL0 itself (when running as root). The shim
+#      inherits env vars pointing at the virtio-serial ports and
+#      connects there.
+#
+# Shim environment (exported before exec):
+#   SYNTHMODEM_AUDIO_PATH   — /dev/virtio-ports/synthmodem.audio
+#   SYNTHMODEM_CONTROL_PATH — /dev/virtio-ports/synthmodem.control
+#   SYNTHMODEM_PTY_PATH     — /dev/ttySL0 (slmodemd creates this)
+#
+# The shim auto-detects that audio/control paths are character
+# devices (not Unix sockets) and opens them directly. Same binary
+# that works in M1 on Unix sockets works here on virtio-serial.
+
+set -e
+
+AUDIO_DEV=/dev/virtio-ports/synthmodem.audio
+CONTROL_DEV=/dev/virtio-ports/synthmodem.control
+# slmodemd creates its PTY symlink at /dev/ttySL<N> when running as
+# root, /tmp/ttySL<N> when running as non-root (modem_main.c line
+# 1691-1694). We run as user 'slmodemd' (uid 100) so it lands in /tmp.
+# The <N> defaults to 0 and increments if 0 already exists.
+PTY_LINK=/tmp/ttySL0
+SHIM=/usr/local/bin/modemd-shim
+SLMODEMD=/usr/local/bin/slmodemd
+
+start() {
+    # rcS mounted /proc /sys /dev /dev/pts /tmp already; these lines
+    # are idempotent safety nets in case S99modem is run by hand.
+    mount -t proc     proc     /proc     2>/dev/null || true
+    mount -t sysfs    sysfs    /sys      2>/dev/null || true
+    mount -t devtmpfs devtmpfs /dev      2>/dev/null || true
+    mkdir -p /dev/pts
+    mount -t devpts   devpts   /dev/pts  2>/dev/null || true
+
+    # Load virtio modules. Debian's i386 kernel has CONFIG_VIRTIO_*=m,
+    # so we must insmod these explicitly before the virtio-serial
+    # device nodes appear under /dev/virtio-ports/.
+    #
+    # Order matters because of module dependencies:
+    #   virtio           (core)
+    #   virtio_ring      (ring buffer — needed by transport drivers)
+    #   virtio_pci_legacy_dev + virtio_pci_modern_dev  (PCI helpers)
+    #   virtio_pci       (the PCI transport — pulls virtio devices onto
+    #                    the PCI bus so they can be enumerated)
+    #   virtio_console   (the character device driver for virtio-serial
+    #                    ports, which is what exposes our chardev-sockets
+    #                    inside the guest)
+    MOD_DIR=/lib/modules/virtio
+    for m in virtio virtio_ring virtio_pci_legacy_dev virtio_pci_modern_dev \
+             virtio_pci virtio_console; do
+        if [ -f "$MOD_DIR/$m.ko" ]; then
+            insmod "$MOD_DIR/$m.ko" 2>/dev/null || true
+        else
+            echo "S99modem: warning: $MOD_DIR/$m.ko not found" >&2
+        fi
+    done
+
+    # Wait for the kernel to populate /sys/class/virtio-ports with the
+    # per-port entries. On a typical boot this takes well under 100ms,
+    # but we cap at 5 s for very slow TCG setups.
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 \
+             21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 \
+             38 39 40 41 42 43 44 45 46 47 48 49 50; do
+        if [ -d /sys/class/virtio-ports ] && \
+           ls /sys/class/virtio-ports/vport*/name >/dev/null 2>&1; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    # Without udev/mdev, /dev/virtio-ports/<name> symlinks don't exist.
+    # Create them ourselves by walking /sys/class/virtio-ports/vport<N>/name
+    # and pointing each to /dev/vport<N>p<M>. Same semantic result as
+    # what udev would do with virtio-port rules.
+    mkdir -p /dev/virtio-ports
+    for dir in /sys/class/virtio-ports/vport*; do
+        [ -d "$dir" ] || continue
+        base=$(basename "$dir")           # e.g. "vport0p1"
+        if [ -r "$dir/name" ]; then
+            pname=$(cat "$dir/name" 2>/dev/null)
+            if [ -n "$pname" ] && [ -c "/dev/$base" ]; then
+                ln -sf "/dev/$base" "/dev/virtio-ports/$pname"
+                chmod 0666 "/dev/$base"
+            fi
+        fi
+    done
+
+    if [ ! -c "$AUDIO_DEV" ] || [ ! -c "$CONTROL_DEV" ]; then
+        echo "S99modem: virtio-serial devices not found" >&2
+        echo "  AUDIO_DEV=$AUDIO_DEV $([ -c $AUDIO_DEV ] && echo exists || echo missing)" >&2
+        echo "  CONTROL_DEV=$CONTROL_DEV $([ -c $CONTROL_DEV ] && echo exists || echo missing)" >&2
+        exit 1
+    fi
+
+    echo "S99modem: starting slmodemd + modemd-shim"
+    echo "  AUDIO_DEV=$AUDIO_DEV"
+    echo "  CONTROL_DEV=$CONTROL_DEV"
+    echo "  PTY_LINK=$PTY_LINK"
+
+    # Pick up synthmodem_log=<level> from the kernel cmdline if present.
+    # QemuVM on the host passes this in through -append when the user
+    # enables diagnostics. Falls back to 'info' if nothing was set.
+    # Busybox sh doesn't have a bash-style regex match, so we grep.
+    KCMDLINE_LOG=$(cat /proc/cmdline 2>/dev/null | tr ' ' '\n' \
+                   | grep '^synthmodem_log=' | head -1 \
+                   | sed 's/^synthmodem_log=//')
+    if [ -n "$KCMDLINE_LOG" ]; then
+        echo "  LOG_LEVEL=$KCMDLINE_LOG (from kernel cmdline)"
+        SYNTHMODEM_LOG_LEVEL="$KCMDLINE_LOG"
+    fi
+
+    # Export env vars for the shim (inherited via slmodemd's fork/exec).
+    export SYNTHMODEM_AUDIO_PATH="$AUDIO_DEV"
+    export SYNTHMODEM_CONTROL_PATH="$CONTROL_DEV"
+    export SYNTHMODEM_PTY_PATH="$PTY_LINK"
+    export SYNTHMODEM_LOG_LEVEL="${SYNTHMODEM_LOG_LEVEL:-info}"
+
+    # Start slmodemd as the 'slmodemd' user (uid 100). Running as
+    # non-root is NOT a security measure here — this is a closed-
+    # world appliance VM with no other users, no network, read-only
+    # fs. We run as uid 100 only because slmodemd upstream always
+    # tries to drop privileges to 'nobody' when started as root, and
+    # that drop-privs code path trips up here in ways that require
+    # either forking the source (which we refuse) or elaborate
+    # workarounds. By starting as a non-root uid, the drop-privs
+    # block takes the getuid()!=0 branch and is skipped entirely.
+    #
+    # The slmodemd user owns everything it touches: the PTY at
+    # /dev/ttySL0, the fork-exec'd shim, and (via chmod 0666 above)
+    # the virtio-serial nodes. There is no effective privilege
+    # boundary inside the VM — the user/group split is cosmetic.
+    #
+    # -d2 gives us startup debug info without being too noisy.
+    # 2>&1 routes stderr to stdout so the serial console captures
+    # everything slmodemd emits.
+    exec su -s /bin/sh slmodemd -c "exec \"$SLMODEMD\" -d2 -e \"$SHIM\" 2>&1"
+}
+
+stop() {
+    # busybox killall may or may not be available; try it, fall back
+    # to a pidof loop.
+    if command -v killall >/dev/null 2>&1; then
+        killall slmodemd 2>/dev/null || true
+    else
+        for pid in $(pidof slmodemd 2>/dev/null); do
+            kill "$pid" 2>/dev/null || true
+        done
+    fi
+}
+
+case "$1" in
+    start|'')  start ;;
+    stop)      stop ;;
+    restart)   stop; sleep 1; start ;;
+    *)         echo "Usage: $0 {start|stop|restart}" >&2; exit 64 ;;
+esac

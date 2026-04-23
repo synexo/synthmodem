@@ -40,6 +40,7 @@ const log = makeLogger('SynthModem');
 
 const sipServer   = new SipServer();
 let activeSession = null;   // single active session (architecture allows expansion)
+let modemPool     = null;   // ModemBackendPool when backend === 'slmodemd'
 
 // ─── SIP event handlers ────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ sipServer.on('invite', async (dialog, msg) => {
 
   log.info(`Incoming call: ${dialog.remoteUri} → ${dialog.localUri}`);
 
-  const session = new CallSession(sipServer, dialog);
+  const session = new CallSession(sipServer, dialog, { modemPool });
   activeSession = session;
 
   session.on('ended', ({ callId, reason }) => {
@@ -71,7 +72,12 @@ sipServer.on('invite', async (dialog, msg) => {
 
 sipServer.on('ack', (dialog) => {
   if (activeSession && activeSession.id === dialog.callId) {
-    activeSession.activate();
+    // activate() is async; its own internal error handling hangs up
+    // on failure. We catch here only to avoid unhandled promise
+    // rejection warnings — nothing to do beyond that.
+    Promise.resolve(activeSession.activate()).catch(err => {
+      log.error(`activate failed: ${err && err.message}`);
+    });
   }
 });
 
@@ -101,10 +107,32 @@ async function main() {
   log.info(`Modem role: ${config.modem.role}, protocols: ${config.modem.protocolPreference.join(', ')}${config.modem.forceProtocol ? ' [FORCED: '+config.modem.forceProtocol+']' : ''}`);
 
   try {
+    // Pre-warm the modem VM if the slmodemd backend is in use. This
+    // gates SIP-server startup on the VM being ready, so our first
+    // "ready" log line truly means we can accept calls without any
+    // 8-second VM boot delay at call time.
+    const backend = (config.modem && config.modem.backend) || 'native';
+    if (backend === 'slmodemd') {
+      const { ModemBackendPool } = require('./backends/ModemBackendPool');
+      log.info('Pre-warming modem VM (slmodemd backend)…');
+      modemPool = new ModemBackendPool({
+        backendOpts: { role: config.modem.role },
+      });
+      modemPool.on('error', err => {
+        log.error(`Modem pool error: ${err.message}`);
+      });
+      await modemPool.start();
+      log.info('Modem VM warm');
+    }
+
     await sipServer.start();
     log.info('SynthModem ready — waiting for calls');
   } catch (err) {
     log.error(`Failed to start: ${err.message}`);
+    // Best-effort cleanup of a partially-started pool.
+    if (modemPool) {
+      try { await modemPool.stop(); } catch (_) {}
+    }
     process.exit(1);
   }
 }
@@ -114,10 +142,22 @@ async function main() {
 process.on('SIGINT',  () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
+let shuttingDown = false;
 async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   log.info(`Received ${signal} — shutting down`);
-  if (activeSession) activeSession.hangup('shutdown');
-  await sipServer.stop();
+  if (activeSession) {
+    try { activeSession.hangup('shutdown'); } catch (_) {}
+  }
+  try { await sipServer.stop(); } catch (err) {
+    log.warn(`SIP stop failed: ${err.message}`);
+  }
+  if (modemPool) {
+    try { await modemPool.stop(); } catch (err) {
+      log.warn(`Modem pool stop failed: ${err.message}`);
+    }
+  }
   process.exit(0);
 }
 

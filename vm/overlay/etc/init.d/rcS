@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# rcS — boot-time setup run by busybox init via /etc/inittab's sysinit.
+#
+# Order of operations:
+#   1. Mount /proc, /sys, /dev, /dev/pts, /tmp. The kernel hands us an
+#      empty rootfs; nothing is mounted until we do it. busybox init
+#      runs this before any respawn entries fire, so S99modem can
+#      assume these mounts exist when it starts.
+#   2. Run any /etc/init.d/S??* scripts except S99modem (which is
+#      launched by inittab on ttyS0).
+#
+# ────────────────────────────────────────────────────────────────────
+# Avoid -e: boot proceeds even if one mount is already done or one
+# script misbehaves. We'd rather get to S99modem than abort boot on a
+# benign EBUSY.
+
+set +e
+
+# ─── 1. Early mounts ────────────────────────────────────────────────
+#
+# These four are what every Linux userland assumes. The initramfs
+# contains empty /proc /sys /dev /tmp directories; we mount the
+# corresponding pseudo-filesystems onto them.
+#
+#   /proc     — process/kernel info interface
+#   /sys      — sysfs (device tree, including virtio ports)
+#   /dev      — devtmpfs, auto-populated by the kernel with
+#               character/block device nodes (serial ports, virtio
+#               ports, etc.)
+#   /dev/pts  — UNIX98 PTY slaves (slmodemd uses these)
+#   /tmp      — tmpfs for scratch files
+#
+# Redirect stderr to /dev/null on each so "already mounted" doesn't
+# clutter the boot log when this script is re-run interactively.
+
+mount -t proc     proc     /proc    2>/dev/null
+mount -t sysfs    sysfs    /sys     2>/dev/null
+mount -t devtmpfs devtmpfs /dev     2>/dev/null
+
+# /dev/pts needs /dev up first — devpts is mounted *inside* devtmpfs.
+mkdir -p /dev/pts 2>/dev/null
+mount -t devpts   devpts   /dev/pts 2>/dev/null
+
+mkdir -p /tmp 2>/dev/null
+mount -t tmpfs    tmpfs    /tmp     2>/dev/null
+
+# ─── 2. Run other Snn init scripts ──────────────────────────────────
+#
+# S99modem is excluded — inittab handles it as a respawn entry on
+# ttyS0 so slmodemd's stdin/stdout land on the serial console where
+# we can see them. Any future S01..S98 scripts would run here.
+
+for s in /etc/init.d/S??*; do
+  [ -x "$s" ] || continue
+  case "$s" in *S99modem) continue ;; esac
+  echo "rcS: $s"
+  "$s" start
+done
+
+exit 0

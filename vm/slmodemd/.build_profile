@@ -1,0 +1,1 @@
+PROFILE_CFLAGS=-std=gnu99 -Wall -g -O -I. -DCONFIG_DEBUG_MODEM -Wall -g -O -I. -DCONFIG_DEBUG_MODEM 

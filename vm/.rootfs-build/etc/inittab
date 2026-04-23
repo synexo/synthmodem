@@ -1,0 +1,8 @@
+# Run boot scripts (sysinit entries complete before respawn fires)
+::sysinit:/etc/init.d/rcS
+# Start our service on the serial console
+ttyS0::respawn:/etc/init.d/S99modem
+# On shutdown, terminate cleanly
+::shutdown:/bin/umount -a -r
+# On ctrl-alt-del, reboot
+::ctrlaltdel:/sbin/reboot

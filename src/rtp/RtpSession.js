@@ -20,8 +20,48 @@ const cfg = config.rtp;
  */
 class RtpSession extends EventEmitter {
 
-  constructor() {
+  /**
+   * @param {object} [opts]
+   * @param {'buffered'|'immediate'|'fixed-buffered'} [opts.playoutMode='buffered']
+   *
+   * 'buffered' — the default for voice. RTP packets go into a jitter buffer
+   *    and are released at 20ms intervals by a setInterval-driven
+   *    playout timer. If a packet isn't there at tick time, emit a
+   *    zero-filled concealment frame. Good for human voice where
+   *    20ms dropouts are imperceptible; the buffer smooths network
+   *    jitter and packet reordering at the cost of ~40-80ms latency.
+   *
+   * 'immediate' — bypass the jitter buffer entirely. Emit 'audio'
+   *    synchronously the moment a packet is decoded. No concealment
+   *    frames are ever emitted. Out-of-order packets are delivered
+   *    out-of-order (acceptable on LAN where reorder is rare).
+   *    Originally used as a workaround for modem audio, where silence
+   *    concealment actively destroys the signal.
+   *
+   * 'fixed-buffered' — D-Modem-style fixed-depth jitter buffer. Packets
+   *    accumulate in a queue until `jitterBufferInitDepth` are held;
+   *    playback then starts and releases one packet every 20ms. If
+   *    the next sequence isn't there at tick time, we SKIP THE TICK
+   *    rather than emit concealment silence — the expectation is that
+   *    the packet will arrive soon and the buffer will absorb the
+   *    jitter. Only on severe underrun (buffer drops to zero and stays
+   *    empty for more than one tick) do we resync. On overflow past
+   *    `jitterBufferMaxDepth`, the oldest packet is dropped. This is
+   *    the approach the D-Modem project uses in their PJSIP-based
+   *    implementation and is credited with enabling days-long modem
+   *    connection stability. The tradeoff is fixed added latency equal
+   *    to `jitterBufferInitDepth × packetIntervalMs` (e.g. 40 × 20ms
+   *    = 800ms), which is imperceptible for modem protocols.
+   */
+  constructor(opts = {}) {
     super();
+    this._playoutMode  = opts.playoutMode || 'buffered';
+    if (this._playoutMode !== 'buffered' &&
+        this._playoutMode !== 'immediate' &&
+        this._playoutMode !== 'fixed-buffered') {
+      throw new TypeError(
+        `RtpSession: playoutMode must be 'buffered', 'immediate', or 'fixed-buffered', got ${this._playoutMode}`);
+    }
     this._socket       = null;
     this._localPort    = null;
     this._remoteAddr   = null;
@@ -121,10 +161,57 @@ class RtpSession extends EventEmitter {
       this.setRemote(rinfo.address, rinfo.port);
     }
 
+    // Immediate mode: skip the jitter buffer entirely. Decode and
+    // emit right now so modem DSPs see every real sample with no
+    // concealment zeros inserted. Out-of-order packets arrive out
+    // of order (acceptable on LAN). Duplicate packets also slip
+    // through; they're rare, and a duplicate late-arriving packet
+    // isn't as bad for a modem as a silence frame.
+    if (this._playoutMode === 'immediate') {
+      this._deliverAudio(payload, pt);
+      return;
+    }
+
     // Jitter buffer insert
     this._jitterBuf.set(seq & 0xffff, { payload, timestamp, pt, received: Date.now() });
 
-    // Initialise play-out pointer on first packet
+    if (this._playoutMode === 'fixed-buffered') {
+      // Fixed-buffered (D-Modem) mode: don't start the playout timer
+      // until the buffer has accumulated jitterBufferInitDepth packets.
+      // When we start, we set _nextPlaySeq to the EARLIEST seq we
+      // currently hold, so playback begins with the oldest pre-buffered
+      // packet (the whole buffer then drains over ~initDepth × 20ms
+      // before new arrivals top it back up). Once started, we never
+      // re-enter this branch because the timer just runs until close.
+      if (this._nextPlaySeq === null) {
+        const initDepth = cfg.jitterBufferInitDepth | 0;
+        if (this._jitterBuf.size >= initDepth) {
+          // Find the smallest seq in the buffer — that's where playout
+          // begins. We use the RTP seq's natural 16-bit wrap-aware
+          // "earliest" by picking the seq whose gap to the newest
+          // arrival seq is largest (but still ≤ the buffer size).
+          let earliest = null;
+          for (const k of this._jitterBuf.keys()) {
+            if (earliest === null) { earliest = k; continue; }
+            // 16-bit signed distance k − earliest (positive = k is later)
+            const d = ((k - earliest) << 16) >> 16;
+            if (d < 0) earliest = k;
+          }
+          this._nextPlaySeq = earliest;
+          log.debug(`Fixed jitter buffer filled to ${initDepth} pkts; starting playout at seq=${earliest}`);
+          this._startPlayoutTimer();
+        }
+      }
+
+      // Guard against runaway buffer growth.
+      const maxDepth = cfg.jitterBufferMaxDepth | 0;
+      if (maxDepth > 0 && this._jitterBuf.size > maxDepth) {
+        this._flushOldest();
+      }
+      return;
+    }
+
+    // Initialise play-out pointer on first packet (legacy 'buffered' mode)
     if (this._nextPlaySeq === null) {
       this._nextPlaySeq = seq;
       this._startPlayoutTimer();
@@ -152,25 +239,62 @@ class RtpSession extends EventEmitter {
       this._nextPlaySeq = (this._nextPlaySeq + 1) & 0xffff;
       this._deliverAudio(pkt.payload, pkt.pt);
       this._silenceCount = 0;
-    } else {
-      // Packet loss or not yet arrived — check if we should skip ahead
-      const buffered = this._jitterBuf.size;
-      if (buffered >= cfg.jitterBufferPackets) {
-        // Find nearest future seq
-        let next = this._nextPlaySeq;
-        for (let i = 1; i <= cfg.maxSeqGap; i++) {
-          if (this._jitterBuf.has((next + i) & 0xffff)) {
-            log.debug(`Jitter: skipping ${i} packet(s)`);
-            this._nextPlaySeq = (next + i) & 0xffff;
-            break;
-          }
+      return;
+    }
+
+    // Packet not present for this tick.
+    //
+    // Fixed-buffered (D-Modem) mode: this tick is a MISS, which in
+    // modem-friendly terms means "the next packet in sequence hasn't
+    // arrived yet." We do NOT emit concealment silence — that would
+    // inject bogus samples into the modem DSP's input and break the
+    // carrier lock. We simply skip this tick and wait for the packet.
+    // The buffered-but-unplayed packets accumulate, which is fine:
+    // that's the whole point of the fixed queue depth.
+    //
+    // Only if we've missed many ticks in a row AND the buffer has
+    // clearly given up on that seq (later seqs have arrived and the
+    // missing one is far behind) do we skip past it. That's
+    // catastrophic loss recovery, not routine concealment.
+    if (this._playoutMode === 'fixed-buffered') {
+      this._silenceCount++;
+      const missThreshold = (cfg.jitterBufferMissSkipTicks | 0) || 50; // 1s at 20ms
+      if (this._silenceCount >= missThreshold && this._jitterBuf.size > 0) {
+        // Give up on `seq`; advance to the smallest seq that IS in
+        // the buffer, so long as the forward distance is bounded.
+        let nearestFuture = null;
+        let nearestDelta  = Infinity;
+        for (const k of this._jitterBuf.keys()) {
+          const d = ((k - seq) << 16) >> 16; // signed 16-bit delta
+          if (d > 0 && d < nearestDelta) { nearestDelta = d; nearestFuture = k; }
+        }
+        if (nearestFuture !== null && nearestDelta <= cfg.maxSeqGap) {
+          log.warn(`Fixed jitter: dropping missing seq=${seq}, resuming at seq=${nearestFuture} (lost ${nearestDelta} pkts)`);
+          this._nextPlaySeq = nearestFuture;
+          this._silenceCount = 0;
         }
       }
-      // Emit concealment silence
-      this._silenceCount++;
-      const samples = this._tsIncrement | 0;
-      this.emit('audio', new Float32Array(samples));
+      return;
     }
+
+    // Legacy 'buffered' (voice) behaviour: emit concealment silence
+    // and speculatively skip ahead if the buffer is growing.
+    const buffered = this._jitterBuf.size;
+    if (buffered >= cfg.jitterBufferPackets) {
+      // Find nearest future seq
+      let next = this._nextPlaySeq;
+      for (let i = 1; i <= cfg.maxSeqGap; i++) {
+        if (this._jitterBuf.has((next + i) & 0xffff)) {
+          log.debug(`Jitter: skipping ${i} packet(s)`);
+          this._nextPlaySeq = (next + i) & 0xffff;
+          break;
+        }
+      }
+    }
+    // Emit concealment silence
+    this._silenceCount++;
+    const samples = this._tsIncrement | 0;
+    this.emit('audio', new Float32Array(samples));
   }
 
   _deliverAudio(payload, pt) {

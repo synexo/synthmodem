@@ -59,10 +59,35 @@ module.exports = {
     packetIntervalMs: 20,
 
     // Jitter buffer size in packets (each packet = packetIntervalMs)
+    // Applies only to the legacy adaptive 'buffered' mode.
     jitterBufferPackets: 4,
 
-    // Jitter buffer max size before packets are dropped
+    // Jitter buffer max size before packets are dropped (legacy 'buffered' mode)
     jitterBufferMaxPackets: 16,
+
+    // ── Fixed-buffered mode parameters (mode === 'fixed-buffered') ──
+    //
+    // These control the D-Modem-style fixed-depth jitter buffer. The
+    // goal is to absorb network jitter with a deep queue rather than
+    // adapt the buffer's size dynamically (which would inject or drop
+    // samples — fatal for modems).
+
+    // Number of packets to buffer before starting playout. D-Modem
+    // uses 40 (800ms at 20ms pkt-time). Higher = more tolerance for
+    // burst loss and bad jitter, but more added latency. Modems don't
+    // care about latency, so erring high is safe.
+    jitterBufferInitDepth: 40,
+
+    // Hard cap on buffer depth. If packets arrive faster than we drain,
+    // we drop the oldest beyond this. D-Modem uses 500 (10s). We also
+    // default to 500; well above anything a sane network should produce.
+    jitterBufferMaxDepth: 500,
+
+    // How many consecutive missed ticks before we give up on the
+    // current expected seq and jump to the nearest future seq held in
+    // the buffer. Without this the buffer could stall forever if a
+    // packet was truly lost in transit. 50 ticks = 1 second at 20ms.
+    jitterBufferMissSkipTicks: 50,
 
     // Payload types to offer in SDP (96+ are dynamic; 0=PCMU, 8=PCMA)
     // Listed in preference order
@@ -77,17 +102,253 @@ module.exports = {
 
     // SSRC for outgoing RTP stream (0 = random)
     outboundSsrc: 0,
+
+    // Playout mode — controls how incoming RTP packets reach the DSP.
+    //
+    //   'buffered'  — adaptive jitter buffer (legacy). Packets go into
+    //                 a jitter buffer and are released at
+    //                 packetIntervalMs intervals. If a packet is missing
+    //                 at tick time, a zero-filled concealment frame is
+    //                 emitted to keep a steady cadence. Good for voice;
+    //                 the 40-80ms added latency is imperceptible and
+    //                 the concealment masks brief network jitter. BAD
+    //                 for modems: silence frames break the DSP PLL lock
+    //                 and cause NO CARRIER.
+    //
+    //   'immediate' — skip the jitter buffer and concealment. Emit
+    //                 'audio' synchronously the moment a packet is
+    //                 decoded. No concealment ever. Originally used
+    //                 as a modem workaround. Trade-off: no reorder
+    //                 tolerance and duplicate packets slip through.
+    //                 On Windows, setInterval(20) drifts enough that
+    //                 buffered mode can consume faster than packets
+    //                 arrive — which immediate mode side-steps entirely.
+    //
+    //   'fixed-buffered' — D-Modem-style fixed-depth queue. Packets
+    //                 accumulate until jitterBufferInitDepth are held;
+    //                 then playback starts at 20ms cadence. On miss,
+    //                 we SKIP THE TICK instead of emitting silence
+    //                 (so the modem DSP never sees fake samples). On
+    //                 severe underrun we re-sync to the next available
+    //                 seq. On overflow we drop oldest. This is the
+    //                 approach that makes D-Modem connections last
+    //                 days instead of minutes. Recommended for modem
+    //                 use; cost is a fixed ~800ms of added latency.
+    //
+    // The slmodemd backend forces 'fixed-buffered' by default (see
+    // CallSession), overriding this setting. Native-DSP mode respects
+    // this config.
+    playoutMode: 'fixed-buffered',
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
   // MODEM DSP ENGINE
   // ─────────────────────────────────────────────────────────────────────────────
   modem: {
+    // ── Backend selection ──
+    // Which modem engine to use:
+    //   'native'   — the built-in pure-JS + spandsp backend. No external
+    //                process. Works on Windows, Linux, macOS. Supports
+    //                V.21/V.22/V.22bis reliably; V.32bis and above are
+    //                experimental.
+    //   'slmodemd' — offload to slmodemd running under QEMU. Supports
+    //                V.21 through V.90. Requires Linux or Windows host
+    //                with the bundled QEMU + VM image.
+    // This is an EXPLICIT choice — no auto-detection. If 'slmodemd' is
+    // selected but the binaries are missing, synthmodem will fail at
+    // start with a clear message. See IMPLEMENTATION.md for the rationale.
+    backend: 'slmodemd',
+
+    // ── slmodemd backend options (used only when backend === 'slmodemd') ──
+    slmodemd: {
+      // How to run slmodemd:
+      //   'qemu' — spawn qemu-system-i386 with the bundled VM image
+      //            (vm/images/bzImage + rootfs.cpio.gz). slmodemd runs
+      //            inside the guest; host talks to it over virtio-serial
+      //            Unix-socket chardevs. This is the shipping mode.
+      //   'host' — spawn slmodemd directly on the host (no VM). Only
+      //            works on Linux hosts with Debian bookworm–compatible
+      //            glibc. Primarily for M1-era development and debugging.
+      mode: 'qemu',
+
+      // ── QEMU mode paths (mode === 'qemu') ──
+      // Path to qemu-system-i386. If unset, we look for QEMU_SYSTEM_I386
+      // in the environment, then fall through to a PATH lookup at spawn.
+      qemuPath: 'C:\\Program Files\\qemu\\qemu-system-i386.exe',
+      // Kernel image (bzImage). Absolute or relative to repo root.
+      kernelPath:    './vm/images/bzImage',
+      // Initramfs (rootfs.cpio.gz).
+      initrdPath:    './vm/images/rootfs.cpio.gz',
+      // Guest RAM in MB. 256 is generous; slmodemd itself needs much less.
+      vmMemoryMb:    256,
+      // Accelerator: 'kvm' (Linux), 'hvf' (macOS), 'whpx' (Windows), 'tcg'
+      // (everywhere, software emulation). Null = autodetect. Forcing
+      // 'tcg' is useful in CI sandboxes without virtualization access.
+      vmAccel:       null,
+      // Extra tokens appended to the kernel cmdline. Mainly for debug
+      // work — S99modem doesn't read these, but they show up in /proc/cmdline.
+      vmAppendExtra: null,
+
+      // ── Host mode paths (mode === 'host') ──
+      // Path to the slmodemd binary (or mock-slmodemd for testing).
+      // Relative paths are resolved against the synthmodem repo root.
+      slmodemdPath: './vm/prebuilt/slmodemd',
+      // Path to the modemd-shim binary. M1 only — M2 runs the shim
+      // inside the VM and inherits it from the initramfs.
+      shimPath:     './vm/prebuilt/modemd-shim-i386',
+      // Extra args to pass to slmodemd before the `-e <shim>` flag.
+      // Typical uses: `-d<level>` for slmodemd's own debug level.
+      slmodemdArgs: [],
+      // PTY path the shim will open. Must match whatever path
+      // slmodemd (or the mock) creates.
+      ptyPath:      '/tmp/synthmodem-ttySL0',
+
+      // ── Shared ──
+      // Log level for the shim inside the guest. Propagated to the VM
+      // via the kernel cmdline (synthmodem_log=<level>), which S99modem
+      // reads and exports as SYNTHMODEM_LOG_LEVEL. Values:
+      //   'error' — only errors (default; quiet startup)
+      //   'info'  — shim connect/HELLO/AT-received traces
+      //   'debug' — per-frame debug, including AT content
+      logLevel:     'debug',
+      // Where to put the Unix sockets for shim ↔ host traffic.
+      // Defaults to os.tmpdir() when null.
+      socketDir:    null,
+
+      // ── Diagnostic/logging (host side) ──
+      // Because the VM is a black box, we offer several layers of
+      // visibility. All default off so production stays quiet.
+
+      // If set to a path, every byte QEMU emits on its combined
+      // stdout+stderr (guest kernel console + guest userspace stdout +
+      // QEMU itself) is appended there. Useful for retroactive boot
+      // diagnosis. Null = no persistent log. The file is created in
+      // append mode; rotate externally if it grows too large.
+      bootLogPath:  './captures/slmodemd-boot.log',
+
+      // If set to a directory, when the VM exits uncleanly (non-zero
+      // status or unexpected mid-session exit), the last 256 KB of the
+      // boot log plus a small metadata sidecar is dumped there. Each
+      // dump gets a timestamped filename. This runs even with
+      // bootLogPath=null — the in-memory buffer is always available.
+      crashDumpDir: null,
+
+      // If true, log every wire frame crossing the Node↔shim boundary
+      // (both directions) at trace level. VERY verbose — a 60-second
+      // call emits tens of thousands of audio frames. Use only for
+      // protocol-level debugging. This runs host-side; the guest is
+      // unaware and unaffected.
+      traceWireFrames: false,
+
+      // ── TCP transport between Node and the VM's QEMU chardev ──
+      //
+      // The VM talks to Node over two TCP loopback connections — one
+      // carrying audio samples (via virtio-serial), one carrying
+      // control messages (AT commands, modem status JSON, wire-framed
+      // data). Node listens; QEMU connects.
+      //
+      // Earlier iterations used Unix sockets on Linux and named pipes
+      // on Windows. Both caused platform-specific jitter/buffering
+      // issues — Windows named pipes especially suffered from libuv
+      // back-to-back small-write corruption and tight kernel buffers.
+      // TCP loopback has been battle-tested in libuv and QEMU, has
+      // generous default buffers (64-128 KB vs pipe ~4 KB), and with
+      // TCP_NODELAY set on both ends has no coalescing gotchas.
+      //
+      // The defaults below sit in a quiet zone between the well-known
+      // ports and the OS ephemeral ranges (Linux 32768+, Windows
+      // 49152+), so there's no risk of the OS pre-allocating them to
+      // unrelated outbound sockets. Override only if you have a local
+      // port conflict, need to run multiple synthmodem instances, or
+      // want to isolate a test run from the defaults.
+      //
+      // Both ports must be >= 1024 (non-privileged), <= 65535, and
+      // different from each other.
+      transport: {
+        audioPort:   25800,
+        controlPort: 25801,
+        // Host interface to bind. Loopback-only by default — the VM
+        // runs on the same machine as Node; there's no reason to
+        // expose these ports on a network interface.
+        bindHost:    '127.0.0.1',
+      },
+
+      // ── Pre-ATA AT command sequence ──
+      //
+      // Array of raw AT commands sent to slmodemd in order BEFORE
+      // the automatic ATA that starts answering. Leave null/empty for
+      // normal operation — slmodemd's defaults run a full V.8
+      // handshake that virtually every modern modem negotiates
+      // cleanly (V.34, V.90, V.92 over V.8, with fallback to V.32bis
+      // / V.22bis / V.22 / V.21 as needed).
+      //
+      // Use this only when you have a specific caller configuration
+      // that needs an explicit modulation or rate bound. Each entry
+      // is passed to slmodemd verbatim and must be a valid AT command
+      // as accepted by slmodemd's command interpreter. slmodemd's
+      // responses (OK / ERROR) are logged but don't halt the sequence.
+      //
+      // Useful commands (see slmodemd's modem_at.c for the authoritative
+      // list, and the D-Modem README for real-world examples):
+      //
+      //   AT+MS=<modulation>[,<automode>[,<minrate>[,<maxrate>]]]
+      //     Select modulation family and rate window.
+      //     modulation: 11=V.21, 22=V.22, 24=V.22bis, 32=V.32, 132=V.32bis,
+      //                 138=V.34, 56=V.56(K56flex), 90=V.90, 92=V.92
+      //     automode:   0 = disable V.8 (use this modulation directly);
+      //                 1 = allow V.8 to pick among capable modulations
+      //     Examples:
+      //       'AT+MS=132,0,4800,9600'  — V.32bis only, 4800-9600 bps
+      //       'AT+MS=138,1,9600,33600' — V.34 preferred via V.8, up to 33.6k
+      //       'AT+MS=24,0,1200,2400'   — V.22bis only, 1200-2400 bps
+      //
+      //   ATS<reg>=<value>
+      //     Set an S-register. Most useful:
+      //       S7  = wait-for-carrier timeout (seconds)
+      //       S10 = carrier-loss disconnect threshold
+      //       S38 = V.42 ODP timeout
+      //
+      //   AT&K<n>   flow control   (0=none, 3=RTS/CTS, 4=XON/XOFF)
+      //   AT\N<n>   error correction (0=normal, 3=V.42/MNP, 5=V.42/MNP required)
+      //   AT%C<n>   compression    (0=disabled, 3=V.42bis/MNP5)
+      //   ATS0=<n>  rings before auto-answer (we already answer via ATA,
+      //             so usually irrelevant)
+      //
+      // Example (V.32bis, 4800-9600 bps only, no error correction):
+      //   atInit: ['AT&Q0', 'AT+MS=132,0,4800,9600']
+      //
+      // Example (force V.22 for a V.22-locked caller using AT+MS=V22,0):
+      //   atInit: ['AT+MS=22,0,1200,1200']
+      //
+      // Errors on any command are logged but do NOT stop the sequence,
+      // because some slmodemd builds emit ERROR on command forms that
+      // still had the intended side-effect, and we'd rather try ATA
+      // than abandon the call at init time.
+      atInit:['AT+MS=132,1,4800,4800'], // same on client (V32B) and disable v.42 (issue AT&Q0) ... 9600 may work
+    },
+
     // Role: 'answer' (SynthModem acts as the answering modem, normal for a server)
     //       'originate' (SynthModem initiates - used by test client)
     role: 'answer',
     captureAudio: true,        // Write WAV per call for debugging
     captureDir: './captures',  // Output directory
+
+    // When true AND backend is 'slmodemd', pull the three diagnostic
+    // audio-dump files from inside the VM at hangup time and write
+    // them alongside the RX/TX WAVs. Files collected:
+    //
+    //   <capture>_modem_rx_8k.raw  — 16-bit 8000 Hz mono, pre-resample
+    //                                 (what shim wrote to slmodemd)
+    //   <capture>_modem_rx.raw     — 16-bit 9600 Hz mono, post-resample
+    //                                 (what the DSP blob sees)
+    //   <capture>_modem_tx.raw     — 16-bit 9600 Hz mono, pre-resample
+    //                                 (what the DSP blob emits)
+    //
+    // Only used for audio-pipeline-integrity diagnostics. Adds a few
+    // hundred ms to hangup while the VM streams the files over the
+    // control channel. Default OFF — opt in by setting true when
+    // investigating audio-path issues.
+    dumpModemPipeline: true,
 
     // Protocol negotiation order (highest preferred first).
     // SynthModem will try these in order during V.8 handshake.

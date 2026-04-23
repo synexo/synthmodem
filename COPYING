@@ -1,0 +1,80 @@
+synthmodem
+==========
+
+synthmodem is licensed under the GNU General Public License,
+version 2 (GPL-2.0-or-later). See licenses/GPL-2.0.txt for the
+complete license text.
+
+This COPYING file is the master license document for every
+synthmodem release. Any binary or source distribution must
+include this file, the licenses/ directory, and the upstream
+notices referenced below.
+
+────────────────────────────────────────────────────────────────
+THIRD-PARTY COMPONENTS BUNDLED IN THIS DISTRIBUTION
+────────────────────────────────────────────────────────────────
+
+1. slmodemd source (vm/slmodemd/*.c, *.h)
+   Copyright (c) Smart Link Ltd. and contributors.
+   License: 3-clause BSD as published by Smart Link (see
+            vm/slmodemd/COPYING and licenses/SLMODEMD-BSD-3.txt),
+            with modifications by the D-Modem / synexo project
+            contributed under GPL-2.0-or-later.
+   The combined work is effectively GPL-2.0-or-later by virtue of
+   the GPL'd modifications.
+   Source: https://github.com/synexo/D-Modem (slmodemd/ subtree),
+           pinned commit recorded in vm/slmodemd/UPSTREAM.txt.
+
+2. Smart Link DSP blob (vm/slmodemd/dsplibs.o)
+   Copyright (c) Smart Link Ltd.
+   License: proprietary, redistribution permitted per Smart Link's
+            grant to the Debian sl-modem-daemon package. See
+            licenses/DSPLIBS-NOTICE for the exact terms and the
+            obligations they impose on redistribution.
+   This file is a closed-source 32-bit i386 ELF object. No source
+   is available. It is used only when the slmodemd backend is
+   active (config.modem.backend = 'slmodemd').
+
+3. modemd-shim (vm/shim/*.c, *.h)
+   Copyright (C) 2026 synthmodem contributors.
+   License: GPL-2.0-or-later.
+
+4. mock slmodemd (test/mock-slmodemd/*.c)
+   Copyright (C) 2026 synthmodem contributors.
+   License: GPL-2.0-or-later.
+   Not shipped in production releases; test-only tool.
+
+5. (M2 and later) Linux kernel, QEMU, Buildroot, musl, busybox
+   All GPL-2.0 or compatible. Each will carry its own LICENSE or
+   COPYING inside the VM image build tree. These will be bundled
+   into the release archive with their original notices under
+   licenses/VM-COMPONENTS/ when M2 adds the VM image.
+
+────────────────────────────────────────────────────────────────
+GPL CORRESPONDING-SOURCE STATEMENT
+────────────────────────────────────────────────────────────────
+
+Because this distribution contains GPL-licensed binaries, anyone
+receiving a binary distribution is entitled to the complete
+corresponding source code for those binaries.
+
+The synthmodem repository IS the corresponding source:
+
+  - All Node.js code under src/, vm/qemu-runner/, test/.
+  - All C code for modemd-shim and mock-slmodemd.
+  - The vendored slmodemd source under vm/slmodemd/, including
+    UPSTREAM.txt recording the exact commit fetched.
+  - The build recipes: vm/Makefile (M2), vm/buildroot-config (M2),
+    vm/kernel-config (M2), scripts/fetch-*.sh.
+
+The proprietary dsplibs.o is NOT GPL'd and is not subject to the
+GPL's corresponding-source requirement. It is redistributed under
+its own permissive terms (see licenses/DSPLIBS-NOTICE).
+
+────────────────────────────────────────────────────────────────
+REPORTING LICENSE CONCERNS
+────────────────────────────────────────────────────────────────
+
+If you believe any component is misattributed, missing from this
+enumeration, or used in violation of its license, please file an
+issue at the synthmodem project tracker.

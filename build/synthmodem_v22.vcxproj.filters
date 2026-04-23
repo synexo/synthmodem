@@ -337,34 +337,25 @@
     <Filter Include="C:">
       <UniqueIdentifier>{F87FD356-0FEB-9BC5-D1FA-368C81420008}</UniqueIdentifier>
     </Filter>
-    <Filter Include="C:\Users">
-      <UniqueIdentifier>{707347A1-1ABA-A9B2-9AF4-DE122F5D7F08}</UniqueIdentifier>
+    <Filter Include="C:\Program Files">
+      <UniqueIdentifier>{079DC0E4-AD6C-4C65-66EB-07165C6B1514}</UniqueIdentifier>
     </Filter>
-    <Filter Include="C:\Users\synex">
-      <UniqueIdentifier>{73DFFBCA-4E42-B61A-28A5-E343DE6F28C0}</UniqueIdentifier>
+    <Filter Include="C:\Program Files\nodejs">
+      <UniqueIdentifier>{0A3FFDD3-2934-8FBC-476C-39417892CCA6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="C:\Users\synex\AppData">
-      <UniqueIdentifier>{DABCEBCE-33D1-4D68-EC67-0BC19A2A0901}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="C:\Users\synex\AppData\Local">
-      <UniqueIdentifier>{ABB0DBB9-8BB5-B9E0-AC72-1BB2674DB872}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="C:\Users\synex\AppData\Local\npm-cache">
-      <UniqueIdentifier>{02387B82-1237-4BF5-6031-99B56DC30ACE}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="C:\Users\synex\AppData\Local\npm-cache\_npx">
-      <UniqueIdentifier>{42E6F723-F0D2-F410-1E59-CC116B0E3074}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="C:\Users\synex\AppData\Local\npm-cache\_npx\c463d28440264a05">
-      <UniqueIdentifier>{726EAF2F-C1CD-1104-3D8B-88896697FF7C}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="C:\Users\synex\AppData\Local\npm-cache\_npx\c463d28440264a05\node_modules">
+    <Filter Include="C:\Program Files\nodejs\node_modules">
       <UniqueIdentifier>{126A39EA-1D28-5689-C126-0DA0AB5837A0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="C:\Users\synex\AppData\Local\npm-cache\_npx\c463d28440264a05\node_modules\node-gyp">
+    <Filter Include="C:\Program Files\nodejs\node_modules\npm">
+      <UniqueIdentifier>{E6F3EBE6-A3A6-AA7E-34C1-5CE4364854E4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="C:\Program Files\nodejs\node_modules\npm\node_modules">
+      <UniqueIdentifier>{126A39EA-1D28-5689-C126-0DA0AB5837A0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="C:\Program Files\nodejs\node_modules\npm\node_modules\node-gyp">
       <UniqueIdentifier>{49558BB4-6D34-CA91-A65D-85A65792DC11}</UniqueIdentifier>
     </Filter>
-    <Filter Include="C:\Users\synex\AppData\Local\npm-cache\_npx\c463d28440264a05\node_modules\node-gyp\src">
+    <Filter Include="C:\Program Files\nodejs\node_modules\npm\node_modules\node-gyp\src">
       <UniqueIdentifier>{F1003AD6-4B6D-45DF-3F56-5CAC869BF55E}</UniqueIdentifier>
     </Filter>
     <Filter Include="..">
@@ -441,8 +432,8 @@
     <ClCompile Include="..\src\native\spandsp\src\vector_int.c">
       <Filter>..\src\native\spandsp\src</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\synex\AppData\Local\npm-cache\_npx\c463d28440264a05\node_modules\node-gyp\src\win_delay_load_hook.cc">
-      <Filter>C:\Users\synex\AppData\Local\npm-cache\_npx\c463d28440264a05\node_modules\node-gyp\src</Filter>
+    <ClCompile Include="C:\Program Files\nodejs\node_modules\npm\node_modules\node-gyp\src\win_delay_load_hook.cc">
+      <Filter>C:\Program Files\nodejs\node_modules\npm\node_modules\node-gyp\src</Filter>
     </ClCompile>
     <None Include="..\binding.gyp">
       <Filter>..</Filter>

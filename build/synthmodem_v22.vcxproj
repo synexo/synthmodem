@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{BBEE63E1-DBC9-4FD4-4034-BD781E837D5E}</ProjectGuid>
+    <ProjectGuid>{077EECB2-FC88-C99C-969B-8F5E1F5710C7}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>synthmodem_v22</RootNamespace>
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
@@ -206,7 +206,7 @@
     <ClCompile Include="..\src\native\spandsp\src\vector_int.c">
       <ObjectFileName>$(IntDir)\src\native\spandsp\src\vector_int.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="C:\Users\synex\AppData\Local\npm-cache\_npx\c463d28440264a05\node_modules\node-gyp\src\win_delay_load_hook.cc"/>
+    <ClCompile Include="C:\Program Files\nodejs\node_modules\npm\node_modules\node-gyp\src\win_delay_load_hook.cc"/>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets"/>
   <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets"/>

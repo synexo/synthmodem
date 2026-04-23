@@ -504,7 +504,7 @@
     "prefix": "C:\\Users\\synex\\AppData\\Roaming\\npm",
     "npm_version": "11.9.0",
     "node_gyp": "C:\\Program Files\\nodejs\\node_modules\\npm\\node_modules\\node-gyp\\bin\\node-gyp.js",
-    "local_prefix": "C:\\Users\\synex\\Documents\\synthdoor_parent\\synthmodem",
+    "local_prefix": "C:\\Users\\synex\\Documents\\synthdoor_parent\\synthmodem_slmodemd",
     "init_module": "C:\\Users\\synex\\.npm-init.js",
     "global_prefix": "C:\\Users\\synex\\AppData\\Roaming\\npm",
     "globalconfig": "C:\\Users\\synex\\AppData\\Roaming\\npm\\etc\\npmrc",

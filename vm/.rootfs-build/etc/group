@@ -1,0 +1,5 @@
+root:x:0:
+dialout:x:20:
+slmodemd:x:100:
+nogroup:x:65534:
+nobody:x:65534:

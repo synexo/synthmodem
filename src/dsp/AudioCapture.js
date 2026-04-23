@@ -103,6 +103,7 @@ class AudioCapture {
     const base = path.join(dir, `${ts}_${tag}`);
     this._rxPath = base + '_rx.wav';
     this._txPath = base + '_tx.wav';
+    this._base   = base;
     this._rx = new WavWriter(this._rxPath);
     this._tx = new WavWriter(this._txPath);
   }
@@ -117,6 +118,32 @@ class AudioCapture {
     if (this._tx) this._tx.writeSamples(samples);
   }
 
+  /**
+   * Write an opaque debug blob next to the WAV captures. Used by the
+   * slmodemd backend to emit /tmp/modem_*.raw dumps alongside the
+   * call's audio recordings. No decoding — just fs.writeFile.
+   *
+   * Filename layout: `<base>_<name>` where base matches the WAV
+   * prefix so the dump files sort together with the WAVs in the
+   * captures directory.
+   *
+   * Returns the written path, or null if capture is disabled.
+   * @param {string} name
+   * @param {Buffer} buf
+   */
+  writeDump(name, buf) {
+    if (this._disabled) return null;
+    if (!name || typeof name !== 'string') {
+      throw new TypeError('writeDump: name must be a non-empty string');
+    }
+    if (!Buffer.isBuffer(buf)) {
+      throw new TypeError('writeDump: buf must be a Buffer');
+    }
+    const outPath = `${this._base}_${name}`;
+    fs.writeFileSync(outPath, buf);
+    return outPath;
+  }
+
   close() {
     if (this._disabled) return;
     if (this._rx) this._rx.close();
@@ -127,6 +154,7 @@ class AudioCapture {
 
   get rxPath() { return this._rxPath; }
   get txPath() { return this._txPath; }
+  get basePath() { return this._base; }
 }
 
 module.exports = { AudioCapture, WavWriter };

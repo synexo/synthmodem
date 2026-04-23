@@ -1,0 +1,22 @@
+# Upstream pin for vm/slmodemd/
+#
+# This directory is a vendored snapshot of the slmodemd subtree from
+# the D-Modem project. We do NOT fork slmodemd: when upstream releases
+# changes, re-run scripts/fetch-slmodemd.sh to refresh this directory,
+# update the commit hash below, and rebuild.
+#
+# See IMPLEMENTATION.md for the policy.
+
+upstream-repo:   https://github.com/synexo/D-Modem
+upstream-path:   slmodemd/
+upstream-commit: 902c79aa36fa094c7513fa911b64f4fa8a0bf614
+vendored-at:     2026-04-21
+
+# Redistribution notes:
+#   - Source files (*.c, *.h) are licensed per slmodemd/COPYING (GPLv2+).
+#   - dsplibs.o is a proprietary closed-source object from Smart Link Ltd.,
+#     redistributed under the terms permitted for the Debian
+#     sl-modem-daemon package. See licenses/DSPLIBS-NOTICE for the exact
+#     terms as shipped.
+#   - Build outputs (*.o, *.bak, slmodemd binary) are NOT vendored;
+#     they are produced during the VM image build.

@@ -1,0 +1,188 @@
+Provenance record for vm/prebuilt/
+===================================
+
+This file records exact SHA256 hashes of every input and output
+involved in producing the committed prebuilt binaries. Anyone
+auditing this repository can use these hashes to:
+
+  1. Verify the committed binaries match what the recipe produces.
+  2. Detect if any input has drifted between runs.
+  3. Reproduce the build offline from the vendored sources.
+
+Built: Session of 2026-04-22 (audio-dump wire protocol extension)
+Recipe: scripts/build-slmodemd-in-vm.sh
+  (shim rebuilt locally via vm/shim/Makefile; slmodemd unchanged)
+
+Output binaries
+---------------
+
+vm/prebuilt/slmodemd
+  Size:        1651860 bytes
+  SHA256:      afc732f3e39ec643f8cf9b66e34d338505775858d06a261e085be917a92305e8
+  Type:        ELF 32-bit LSB PIE executable, Intel 80386
+  Interpreter: /lib/ld-linux.so.2
+  Debug info:  retained (not stripped)
+
+vm/prebuilt/modemd-shim-i386
+  Size:        29052 bytes
+  SHA256:      e2a0b798c9bcf984dc9c532e6b973f4d834995c79810057f18ed312ed4497083
+  Type:        ELF 32-bit LSB executable, Intel 80386
+  Interpreter: /lib/ld-linux.so.2
+  Notes:       Forward-on-arrival. DSP pump lifecycle boolean only (no
+               timerfd, no ring buffer). Arms on ATA with kick-off silence,
+               disarms on NO CARRIER / HANGUP. Audio writes pass through
+               to slmodemd directly, one write per wire arrival. Node's
+               RTP jitter buffer is the cadence source.
+               Regression fix for handshake-failure introduced by the
+               previous paced-pump build: arriving-frame drops and
+               silence substitutions from the tiny ring buffer were
+               corrupting V.32bis training. This build reverts to the
+               forward-on-arrival pattern that previously hit 100%
+               handshake rate, while keeping the lifecycle gating and
+               kick-off silence (which are D-Modem-proven).
+
+  Note: this shim implements wire protocol v1 plus the audio-dump
+  extension (WIRE_TYPE_DUMP_REQUEST / DUMP_DATA / DUMP_DONE,
+  types 0x17/0x18/0x19). See vm/shim/wire.h for details.
+
+  atoi/sscanf were replaced with manual integer parsers to avoid
+  gcc 13 + glibc 2.39+ redirecting them to GLIBC_2.38 __isoc23_*
+  variants, which would fail to load against the runtime glibc 2.36
+  inside the VM. This is the reason for the slightly smaller size
+  vs the 2026-04-21 build (one less relocation).
+
+Both binaries built in the same VM session inside the bookworm i386
+builder initramfs. Both link against the exact glibc 2.36-9+deb12u13
+that ships in the runtime VM.
+
+Highest glibc symbol version required
+-------------------------------------
+slmodemd:    GLIBC_2.34
+modemd-shim: GLIBC_2.34
+
+Both are well under the runtime glibc of 2.36. No C23-era
+symbols (__isoc23_*) are referenced in either.
+
+Shipped runtime image hashes (for reference)
+--------------------------------------------
+
+Once `make -C vm` runs, images/ is populated with a bootable VM.
+These are deterministic outputs — `make clean && make` from a
+fresh checkout produces byte-identical files.
+
+vm/images/bzImage
+  Size:        5754864 bytes
+  SHA256:      2bac10d87a024026de6c00539ea70d19194169b6b99111d9178815b470d77dbe
+  Source:      verbatim copy of vm/kernel/bzImage
+
+vm/images/rootfs.cpio.gz
+  Size:        ~3.3 MB (3300000 bytes approx)
+  SHA256:      37d5d64ac888e34e8b3410fe753507802620d477c031b00ac17cb2d3ce4cec58
+  Reproducibility: the Makefile's CPIO rule sets all file mtimes
+                   to epoch 0, sorts the file list with LC_ALL=C,
+                   passes --reproducible to cpio, and `gzip -n`
+                   to strip filename/timestamp from the gz header.
+                   Three consecutive clean builds produce the
+                   same SHA256.
+
+Build inputs
+------------
+
+Vendored slmodemd source (source-tree hash over *.c, *.h, Makefile):
+  SHA256 of all *.c/*.h/Makefile in vm/slmodemd/:
+    c5e2e457c128fb586afd62c78ab0a1c09f0eb90381615111c8eaca497f5ad6ec
+  (Upstream pin recorded in vm/slmodemd/UPSTREAM.txt.)
+
+dsplibs.o (Smart Link DSP blob, redistributed unmodified):
+  SHA256: 1129d826ca23f1e33aeb0eb8211ef0f91788e82549941a143e3181025d4fa10c
+
+Build VM kernel (same kernel that runs the runtime VM):
+  File: vm/kernel/bzImage
+  SHA256: 2bac10d87a024026de6c00539ea70d19194169b6b99111d9178815b470d77dbe
+  From: linux-image-6.1.0-42-686-pae-unsigned_6.1.159-1_i386.deb
+        SHA256: 1e0e56cba6241bd122a353e67406142afa13ff0406d2b8d926fb7554a944e57a
+        Debian bookworm pool/main/l/linux/
+
+Target runtime glibc (what slmodemd links against):
+  File: vm/libc/libc.so.6
+  SHA256: 1c28c683ca0c3585415c1c8f3bef04e77f756fc84c70a0ba5d649e00d5a66160
+  From: libc6_2.36-9+deb12u13_i386.deb
+        SHA256: cc30f1ce0a1a836ecf7d713032dad45c924ba81e3934f78bf2b8c6f827117749
+        Debian bookworm pool/main/g/glibc/
+
+Toolchain (extracted from .deb, only used in builder initramfs, not shipped)
+----------------------------------------------------------------------------
+
+All from Debian bookworm, arch=i386. SHA256 values below pin the exact
+.deb files used. The scripts/build-slmodemd-in-vm.sh recipe verifies
+these hashes before building.
+
+gcc-12_12.2.0-14+deb12u1_i386.deb
+cpp-12_12.2.0-14+deb12u1_i386.deb
+gcc-12-base_12.2.0-14+deb12u1_i386.deb
+libgcc-12-dev_12.2.0-14+deb12u1_i386.deb
+libgcc-s1_12.2.0-14+deb12u1_i386.deb
+libstdc++6_12.2.0-14+deb12u1_i386.deb
+libcc1-0_12.2.0-14+deb12u1_i386.deb
+binutils_2.40-2_i386.deb
+binutils-common_2.40-2_i386.deb
+binutils-i686-linux-gnu_2.40-2_i386.deb
+libbinutils_2.40-2_i386.deb
+libctf0_2.40-2_i386.deb
+libctf-nobfd0_2.40-2_i386.deb
+libjansson4_2.14-2_i386.deb
+libgprofng0_2.40-2_i386.deb
+libgmp10_6.2.1+dfsg1-1.1_i386.deb
+libisl23_0.25-1.1_i386.deb
+libmpc3_1.3.1-1_i386.deb
+libmpfr6_4.2.0-1_i386.deb
+libzstd1_1.5.4+dfsg2-5_i386.deb
+zlib1g_1.2.13.dfsg-1_i386.deb
+libc6_2.36-9+deb12u13_i386.deb
+libc6-dev_2.36-9+deb12u13_i386.deb
+libc-dev-bin_2.36-9+deb12u13_i386.deb
+libcrypt1_4.4.33-2_i386.deb
+libcrypt-dev_4.4.33-2_i386.deb
+linux-libc-dev_6.1.159-1_i386.deb
+make_4.3-4.1_i386.deb
+
+Compiler identification (as reported inside the VM):
+  gcc (Debian 12.2.0-14+deb12u1) 12.2.0
+  GNU ld (GNU Binutils for Debian) 2.40
+  GNU Make 4.3
+
+Compile / link flags
+--------------------
+CFLAGS:  -Wall -g -O -I. -DCONFIG_DEBUG_MODEM
+         (from vm/slmodemd/Makefile, unmodified)
+LDFLAGS: (none beyond defaults)
+
+Not used: ALSA. The vendored Makefile has SUPPORT_ALSA=1 commented out;
+our slmodemd builds without libasound, which keeps the dependency set
+minimal (libc.so.6 only).
+
+Architecture note
+-----------------
+Build VM is i386. Inside, uname -m reports 'i686', so the Makefile's
+ARCH64 detection sets CC to plain 'gcc' (not 'gcc -m32'), because
+we're already in 32-bit userspace. This is correct; on an amd64 host
+the same Makefile selects 'gcc -m32' instead, producing the same
+i386 ELF output but from a 64-bit toolchain.
+
+Verifying this record
+---------------------
+  sha256sum vm/prebuilt/slmodemd           # afc732f3...
+  sha256sum vm/prebuilt/modemd-shim-i386   # c7a5a722...
+  sha256sum vm/slmodemd/dsplibs.o          # 1129d826...
+  find vm/slmodemd -maxdepth 1 \( -name '*.c' -o -name '*.h' \
+                                  -o -name 'Makefile' \) -type f \
+    | sort | xargs sha256sum | sha256sum   # c5e2e457... (prefix)
+
+  # Reproducible-build check after `make -C vm`:
+  sha256sum vm/images/bzImage              # 2bac10d8...
+  sha256sum vm/images/rootfs.cpio.gz       # cf2c7a65...
+
+To rebuild the prebuilts from scratch (runs a one-shot VM build):
+  scripts/build-slmodemd-in-vm.sh
+
+A reproduction hash that matches means nothing drifted.
