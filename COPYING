@@ -1,0 +1,224 @@
+synthmodem
+==========
+
+synthmodem is licensed under the GNU General Public License,
+version 2 (GPL-2.0-or-later). See licenses/GPL-2.0.txt for the
+complete license text.
+
+This COPYING file is the master license document for every
+synthmodem release. Any binary or source distribution must
+include this file, the licenses/ directory, and the upstream
+notices referenced below.
+
+For the maintainer-side workflow that produces distributable
+releases (vendoring sources, rebuilding prebuilts, satisfying
+GPL §3(a) corresponding-source obligations), see MAINTAINERS.md.
+
+────────────────────────────────────────────────────────────────
+THIRD-PARTY COMPONENTS BUNDLED IN THIS DISTRIBUTION
+────────────────────────────────────────────────────────────────
+
+1. slmodemd source (vm/slmodemd/*.c, *.h)
+   Copyright (c) Smart Link Ltd. and contributors.
+   License: 3-clause BSD as published by Smart Link (see
+            vm/slmodemd/COPYING and licenses/SLMODEMD-BSD-3.txt),
+            with modifications by the D-Modem / synexo project
+            contributed under GPL-2.0-or-later.
+   The combined work is effectively GPL-2.0-or-later by virtue of
+   the GPL'd modifications.
+   Source: https://github.com/synexo/D-Modem (slmodemd/ subtree),
+           pinned commit recorded in vm/slmodemd/UPSTREAM.txt.
+
+2. Smart Link DSP blob (vm/slmodemd/dsplibs.o)
+   Copyright (c) Smart Link Ltd.
+   License: proprietary, redistribution permitted per Smart Link's
+            grant to the Debian sl-modem-daemon package. See
+            licenses/DSPLIBS-NOTICE for the exact terms and the
+            obligations they impose on redistribution.
+   This file is a closed-source 32-bit i386 ELF object. No source
+   is available. It is used only when the slmodemd-pjsip backend
+   is active (config.modem.backend = 'slmodemd-pjsip'); the
+   default 'native' backend does not link against it.
+
+3. d-modem glue (vm/d-modem/d-modem.c)
+   Copyright (C) 2021 Aon plc.
+   License: GPL-2.0-or-later. See licenses/D-MODEM-NOTICE for
+            attribution details and licenses/GPL-2.0.txt for the
+            full license text.
+   Vendored verbatim from https://github.com/synexo/D-Modem, pinned
+   commit recorded in vm/d-modem/UPSTREAM.txt. Builds against PJSIP
+   (entry 4) and slmodemd (entry 1) to produce vm/prebuilt/d-modem,
+   the backend helper used when config.modem.backend = 'slmodemd-pjsip'.
+
+4. PJSIP / pjproject (vm/sources/pjproject-2.15.1.tar.gz)
+   Copyright (C) 2003-2024 Teluu Inc. and contributors.
+   License: PJSIP is dual-licensed (GPL-2.0-or-later, or a Teluu
+            commercial license). synthmodem redistributes under the
+            GPL-2.0-or-later option. See licenses/PJSIP-NOTICE for
+            attribution, upstream pointers, and dual-license details.
+   Upstream release 2.15.1, fetched from
+   https://github.com/pjsip/pjproject/archive/refs/tags/2.15.1.tar.gz
+   and pinned by SHA256 in scripts/fetch-vm-sources.sh. The tarball
+   in vm/sources/ is unpacked inside the bookworm build VM and
+   statically linked into vm/prebuilt/d-modem. Our build-time
+   customization (empty config_site.h at vendor time) lives at
+   vm/pjsip/config_site.h; no PJSIP source files are modified.
+
+5. modemd-tunnel (vm/tunnel/*.c, *.h)
+   Copyright (C) 2026 synthmodem contributors.
+   License: GPL-2.0-or-later.
+   Standalone i386 helper that bridges UDP datagrams between Node
+   on the host and PJSIP inside the runtime VM over a TCP virtio-
+   serial chardev. Source is in-tree; no upstream pin. Wire
+   protocol is documented in vm/tunnel/PROTOCOL.md.
+
+6. modemd-ctrl (vm/ctrl/*.c, *.h)
+   Copyright (C) 2026 synthmodem contributors.
+   License: GPL-2.0-or-later.
+   Standalone i386 helper that bridges slmodemd's PTY to the Node
+   host over a TCP virtio-serial chardev. Source is in-tree; no
+   upstream pin. Used by the slmodemd-pjsip backend so Node can
+   drive AT commands and exchange data-mode bytes with slmodemd.
+
+7. spandsp-derived JavaScript code (src/dsp/V8Sequencer.js,
+   src/dsp/protocols/V22Demodulator.js, src/dsp/protocols/V22RxRRC.js,
+   src/dsp/protocols/V22Common.js, src/dsp/protocols/V22.js,
+   src/dsp/protocols/FskCommon.js)
+   Original copyright: Copyright (C) 2003-2009 Steve Underwood
+                       <steveu@coppice.org>.
+   JavaScript port:    synthmodem contributors, 2026.
+   Upstream license:   LGPL-2.1 (https://github.com/freeswitch/spandsp).
+   License as redistributed by synthmodem: GPL-2.0-or-later, via the
+            LGPL-2.1 §3 election to relicense LGPL-2.1 work under
+            the ordinary GPL. See licenses/SPANDSP-NOTICE for the
+            list of files affected, the per-file ports they derive
+            from, the documented adaptations, and the rationale for
+            the §3 election. The LGPL-2.1 text (as the upstream
+            license) is at licenses/LGPL-2.1.txt; the GPL-2.0 text
+            (as the as-redistributed license) is at
+            licenses/GPL-2.0.txt.
+   No spandsp C/C++ source is shipped; the prior native addons in
+   src/native/ were removed in cleanup-phase-2. The spandsp upstream
+   tree is not vendored — see SPANDSP-NOTICE for the
+   corresponding-source analysis.
+
+8. Linux kernel (vm/sources/linux_*.tar.xz)
+   Copyright (C) Linus Torvalds and contributors.
+   License: GPL-2.0-only WITH Linux-syscall-note exception (the
+            standard kernel licensing per the upstream COPYING file
+            — the syscall exception clarifies that user-space
+            programs invoking kernel services through normal system
+            calls are not derivative works). See
+            licenses/LINUX-KERNEL-NOTICE for upstream pointers,
+            version pin, and corresponding-source details.
+   Debian bookworm linux-image-6.1.0-42-686-pae-unsigned. We
+   redistribute the compiled kernel image at vm/kernel/bzImage
+   plus selected modules at vm/kernel/modules/. Corresponding
+   source under vm/sources/ (split tarball; see
+   vm/sources/README.md for reassembly).
+
+9. busybox (vm/sources/busybox_*.tar.bz2)
+   Copyright (C) Erik Andersen and contributors.
+   License: GPL-2.0-only (busybox 1.3.0 and later are GPLv2-only;
+            the "or later" option does not apply). See
+            licenses/BUSYBOX-NOTICE for upstream pointers, version
+            pin, and corresponding-source details.
+   Debian bookworm busybox-static. We redistribute the compiled
+   binary at vm/busybox/busybox. Corresponding source under
+   vm/sources/.
+
+10. glibc (vm/sources/glibc_*.tar.xz)
+    Copyright (C) Free Software Foundation and contributors.
+    License: LGPL-2.1-or-later. See licenses/GLIBC-NOTICE for
+             upstream pointers, version pin, the §6 relinking
+             posture, and corresponding-source details.
+    Debian bookworm libc6 (glibc 2.36-9+deb12u13). We redistribute
+    selected shared libraries (ld-linux.so.2, libc.so.6, libm.so.6)
+    at vm/libc/. Corresponding source under vm/sources/.
+
+11. Node.js (win/nodejs/)
+    Copyright (c) Node.js contributors. All rights reserved.
+    License: MIT. See licenses/NODEJS-LICENSE for the complete
+             license text (which also covers Node.js's bundled
+             third-party libraries such as V8, libuv, OpenSSL,
+             etc., each under their own permissive terms as
+             enumerated in that file).
+    This component is included only in the Windows distribution
+    at win/nodejs/ and is not part of the Linux distribution.
+    Corresponding source: win/nodejs-release/node-v25.9.0-win.x64.zip
+    MIT does not require source distribution, but the source is
+    included for completeness.
+
+12. QEMU (win/qemu/)
+    Copyright (c) QEMU contributors. See the QEMU source tree for
+    individual file copyrights.
+    License: GPL-2.0. See licenses/QEMU-NOTICE for attribution and
+             corresponding-source details, and licenses/GPL-2.0.txt
+             for the complete license text.
+    Version: 11.0.50. This component is included only in the Windows
+    distribution at win/qemu/ and is not part of the Linux distribution.
+    Corresponding source: win/qemu-source/qemu-master.zip
+
+────────────────────────────────────────────────────────────────
+GPL CORRESPONDING-SOURCE STATEMENT
+────────────────────────────────────────────────────────────────
+
+Because this distribution contains GPL-licensed binaries, anyone
+receiving a binary distribution is entitled to the complete
+corresponding source code for those binaries.
+
+The synthmodem repository IS the corresponding source:
+
+  - All Node.js code under src/, vm/qemu-runner/, test/. This
+    includes the spandsp-derived JS modules listed in entry 7;
+    those .js files are themselves the distributable source form.
+  - All C code for modemd-tunnel and modemd-ctrl, in-tree under
+    vm/tunnel/ and vm/ctrl/.
+  - The vendored slmodemd source under vm/slmodemd/, including
+    UPSTREAM.txt recording the exact commit fetched.
+  - The vendored d-modem.c source under vm/d-modem/, including
+    UPSTREAM.txt recording the D-Modem commit and the file SHA256.
+  - The vendored PJSIP release tarball under vm/sources/
+    (pjproject-*.tar.gz), with SHA256 pinned in
+    scripts/fetch-vm-sources.sh and release metadata in
+    vm/pjsip/UPSTREAM.txt. Our PJSIP build customization
+    (vm/pjsip/config_site.h) and d-modem build recipe
+    (vm/d-modem/Makefile) are in-tree.
+  - The vendored Linux kernel, busybox, and glibc source tarballs
+    under vm/sources/ (linux_*, busybox_*, glibc_* — see
+    vm/sources/README.md for the full inventory).
+  - The QEMU source tarball for the Windows distribution, at
+    win/qemu-source/qemu-master.zip, corresponding to the prebuilt
+    QEMU binaries at win/qemu/. See licenses/QEMU-NOTICE.
+  - The Node.js source for the Windows distribution, at
+    win/nodejs-release/node-v25.9.0-win.x64.zip, corresponding to
+    the Node.js runtime at win/nodejs/. (MIT-licensed; included for
+    completeness only.)
+  - The build recipes: vm/Makefile, scripts/fetch-vm-sources.sh,
+    scripts/fetch-vm-binaries.sh, scripts/build-slmodemd-in-vm.sh,
+    scripts/build-pjsip-in-vm.sh.
+
+The proprietary dsplibs.o is NOT GPL'd and is not subject to the
+GPL's corresponding-source requirement. It is redistributed under
+its own permissive terms (see licenses/DSPLIBS-NOTICE).
+
+The spandsp upstream C source tree is NOT vendored. synthmodem
+does not distribute any compiled spandsp binary, and the
+corresponding-source obligation attaches to what is distributed
+(the JavaScript ports, which are themselves source). Recipients
+who wish to compare the ports against upstream may use the
+file/line citations in each ported module to consult spandsp
+directly at https://github.com/freeswitch/spandsp. See
+licenses/SPANDSP-NOTICE.
+
+See MAINTAINERS.md for the operational procedure (vendoring
+script invocations, GPL compliance checklist, and the offline
+rebuild workflow).
+
+────────────────────────────────────────────────────────────────
+REPORTING LICENSE CONCERNS
+────────────────────────────────────────────────────────────────
+
+If you believe any component is misattributed, missing from this
+enumeration, or used in violation of its license, please file an
+issue at the synthmodem project tracker.

@@ -1,0 +1,354 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Independent Guest Virtual Machine (IGVM) support &mdash; QEMU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=f5127f15" />
+      <link rel="stylesheet" type="text/css" href="../_static/theme_overrides.css?v=b3ae9cc8" />
+
+  
+    <link rel="shortcut icon" href="../_static/qemu_32x32.png"/>
+      <script src="../_static/jquery.js?v=8dae8fb0"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3b5cce75"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/custom.js?v=2ab9f71d"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="AWS Nitro Enclaves" href="nitro.html" />
+    <link rel="prev" title="Confidential Guest Support" href="confidential-guest-support.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #802400" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QEMU
+              <img src="../_static/qemu_128x128.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about/index.html">About QEMU</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">System Emulation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="invocation.html">Invocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="device-emulation.html">Device Emulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keys.html">Keys in the graphical frontends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mux-chardev.html">Keys in the character backend multiplexer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="monitor.html">QEMU Monitor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="images.html">Disk Images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio-net-failover.html">QEMU virtio-net standby (net_failover)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linuxboot.html">Direct Linux Boot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generic-loader.html">Generic Loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guest-loader.html">Guest Loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="barrier.html">QEMU Barrier Client</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vnc-security.html">VNC security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tls.html">TLS setup for network services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="secrets.html">Providing secret data to QEMU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="authz.html">Client authorization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gdb.html">GDB usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="replay.html">Record/replay</a></li>
+<li class="toctree-l2"><a class="reference internal" href="managed-startup.html">Managed start up options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bootindex.html">Managing device boot order with bootindex properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cpu-hotplug.html">Virtual CPU hotplug</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pr-manager.html">Persistent reservation managers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="targets.html">QEMU System Emulator Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi-process.html">Multi-process QEMU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="confidential-guest-support.html">Confidential Guest Support</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Independent Guest Virtual Machine (IGVM) support</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#further-information-on-igvm">Further Information on IGVM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#supported-platforms">Supported Platforms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#limitations-when-using-igvm-with-amd-sev-sev-es-and-sev-snp">Limitations when using IGVM with AMD SEV, SEV-ES and SEV-SNP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#initial-cpu-state-with-vmsa">Initial CPU state with VMSA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#firmware-images-with-igvm">Firmware Images with IGVM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#running-a-guest-configured-using-igvm">Running a guest configured using IGVM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nitro.html">AWS Nitro Enclaves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="whpx.html">Windows Hypervisor Platform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vm-templating.html">QEMU VM templating</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sriov.html">Composable SR-IOV device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-colo.html">Qemu COLO Fault Tolerance</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user/index.html">User Mode Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interop/index.html">System Emulation Management and Interoperability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../specs/index.html">System Emulation Guest Hardware Specifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../devel/index.html">Developer Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #802400" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QEMU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">System Emulation</a></li>
+      <li class="breadcrumb-item active">Independent Guest Virtual Machine (IGVM) support</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="https://gitlab.com/qemu-project/qemu/-/blob/master/docs/system/igvm.rst">View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="independent-guest-virtual-machine-igvm-support">
+<h1>Independent Guest Virtual Machine (IGVM) support<a class="headerlink" href="#independent-guest-virtual-machine-igvm-support" title="Link to this heading"></a></h1>
+<p>IGVM files are designed to encapsulate all the information required to launch a
+virtual machine on any given virtualization stack in a deterministic way. This
+allows the cryptographic measurement of initial guest state for Confidential
+Guests to be calculated when the IGVM file is built, allowing a relying party to
+verify the initial state of a guest via a remote attestation.</p>
+<p>Although IGVM files are designed with Confidential Computing in mind, they can
+also be used to configure non-confidential guests. Multiple platforms can be
+defined by a single IGVM file, allowing a single IGVM file to configure a
+virtual machine that can run on, for example, TDX, SEV and non-confidential
+hosts.</p>
+<p>QEMU supports IGVM files through the user-creatable <code class="docutils literal notranslate"><span class="pre">igvm-cfg</span></code> object. This
+object is used to define the filename of the IGVM file to process. A reference
+to the object is added to the <code class="docutils literal notranslate"><span class="pre">-machine</span></code> to configure the virtual machine
+to use the IGVM file for configuration.</p>
+<p>Confidential platform support is provided through the use of
+the <code class="docutils literal notranslate"><span class="pre">ConfidentialGuestSupport</span></code> object. If the virtual machine provides an
+instance of this object then this is used by the IGVM loader to configure the
+isolation properties of the directives within the file.</p>
+<section id="further-information-on-igvm">
+<h2>Further Information on IGVM<a class="headerlink" href="#further-information-on-igvm" title="Link to this heading"></a></h2>
+<p>Information about the IGVM format, including links to the format specification
+and documentation for the Rust and C libraries can be found at the project
+repository:</p>
+<p><a class="reference external" href="https://github.com/microsoft/igvm">https://github.com/microsoft/igvm</a></p>
+</section>
+<section id="supported-platforms">
+<h2>Supported Platforms<a class="headerlink" href="#supported-platforms" title="Link to this heading"></a></h2>
+<p>Currently, IGVM files can be provided for Confidential Guests on host systems
+that support AMD SEV, SEV-ES and SEV-SNP with KVM. IGVM files can also be
+provided for non-confidential guests.</p>
+</section>
+<section id="limitations-when-using-igvm-with-amd-sev-sev-es-and-sev-snp">
+<h2>Limitations when using IGVM with AMD SEV, SEV-ES and SEV-SNP<a class="headerlink" href="#limitations-when-using-igvm-with-amd-sev-sev-es-and-sev-snp" title="Link to this heading"></a></h2>
+<p>IGVM files configure the initial state of the guest using a set of directives.
+Not every directive is supported by every Confidential Guest type. For example,
+AMD SEV does not support encrypted save state regions, therefore setting the
+initial CPU state using IGVM for SEV is not possible. When an IGVM file contains
+directives that are not supported for the active platform, an error is generated
+and the guest launch is aborted.</p>
+<p>The table below describes the list of directives that are supported for SEV,
+SEV-ES, SEV-SNP and non-confidential platforms.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">SEV, SEV-ES, SEV-SNP &amp; non-confidential Supported Directives</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>IGVM directive</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>IGVM_VHT_PAGE_DATA</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">NORMAL</span></code> zero, measured and unmeasured page types are supported. Other
+page types result in an error.</p></td>
+</tr>
+<tr class="row-odd"><td><p>IGVM_VHT_PARAMETER_AREA</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>IGVM_VHT_PARAMETER_INSERT</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>IGVM_VHT_VP_COUNT_PARAMETER</p></td>
+<td><p>The guest parameter page is populated with the CPU count.</p></td>
+</tr>
+<tr class="row-even"><td><p>IGVM_VHT_ENVIRONMENT_INFO_PARAMETER</p></td>
+<td><p>The <code class="docutils literal notranslate"><span class="pre">memory_is_shared</span></code> parameter is set to 1 in the guest parameter
+page.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Additional SEV, SEV-ES &amp; SEV_SNP Supported Directives</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>IGVM directive</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>IGVM_VHT_MEMORY_MAP</p></td>
+<td><p>The memory map page is populated using entries from the E820 table.</p></td>
+</tr>
+<tr class="row-odd"><td><p>IGVM_VHT_REQUIRED_MEMORY</p></td>
+<td><p>Ensures memory is available in the guest at the specified range.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Additional SEV-ES &amp; SEV-SNP Supported Directives</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>IGVM directive</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>IGVM_VHT_VP_CONTEXT</p></td>
+<td><p>Setting of the initial CPU state for the boot CPU and additional CPUs is
+supported with limitations on the fields that can be provided in the
+VMSA. See below for details on which fields are supported.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="initial-cpu-state-with-vmsa">
+<h2>Initial CPU state with VMSA<a class="headerlink" href="#initial-cpu-state-with-vmsa" title="Link to this heading"></a></h2>
+<p>The initial state of guest CPUs can be defined in the IGVM file for AMD SEV-ES
+and SEV-SNP. The state data is provided as a VMSA structure as defined in Table
+B-4 in the AMD64 Architecture Programmer’s Manual, Volume 2 [1].</p>
+<p>The IGVM VMSA is translated to CPU state in QEMU which is then synchronized
+by KVM to the guest VMSA during the launch process where it contributes to the
+launch measurement. See <a class="reference internal" href="i386/amd-memory-encryption.html#amd-sev"><span class="std std-ref">AMD Secure Encrypted Virtualization (SEV)</span></a> for details on the launch process and
+guest launch measurement.</p>
+<p>It is important that no information is lost or changed when translating the
+VMSA provided by the IGVM file into the VSMA that is used to launch the guest.
+Therefore, QEMU restricts the VMSA fields that can be provided in the IGVM
+VMSA structure to the following registers:</p>
+<p>RAX, RCX, RDX, RBX, RBP, RSI, RDI, R8-R15, RSP, RIP, CS, DS, ES, FS, GS, SS,
+CR0, CR3, CR4, XCR0, EFER, PAT, GDT, IDT, LDTR, TR, DR6, DR7, RFLAGS, X87_FCW,
+MXCSR.</p>
+<p>When processing the IGVM file, QEMU will check if any fields other than the
+above are non-zero and generate an error if this is the case.</p>
+<p>KVM uses a hardcoded GPA of 0xFFFFFFFFF000 for the VMSA. When an IGVM file
+defines initial CPU state, the GPA for each VMSA must match this hardcoded
+value.</p>
+</section>
+<section id="firmware-images-with-igvm">
+<h2>Firmware Images with IGVM<a class="headerlink" href="#firmware-images-with-igvm" title="Link to this heading"></a></h2>
+<p>When an IGVM filename is specified for a Confidential Guest Support object it
+overrides the default handling of system firmware: the firmware image, such as
+an OVMF binary should be contained as a payload of the IGVM file and not
+provided as a flash drive or via the <code class="docutils literal notranslate"><span class="pre">-bios</span></code> parameter. The default QEMU
+firmware is not automatically populated into the guest memory space.</p>
+<p>If an IGVM file is provided along with either the <code class="docutils literal notranslate"><span class="pre">-bios</span></code> parameter or pflash
+devices then an error is displayed and the guest startup is aborted.</p>
+</section>
+<section id="running-a-guest-configured-using-igvm">
+<h2>Running a guest configured using IGVM<a class="headerlink" href="#running-a-guest-configured-using-igvm" title="Link to this heading"></a></h2>
+<p>To run a guest configured with IGVM you firstly need to generate an IGVM file
+that contains a guest configuration compatible with the platform you are
+targeting.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">buildigvm</span></code> tool [2] is an example of a tool that can be used to generate
+IGVM files for non-confidential X86 platforms as well as for SEV, SEV-ES and
+SEV-SNP confidential platforms.</p>
+<p>Example using this tool to generate an IGVM file for AMD SEV-SNP:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">buildigvm</span> <span class="o">--</span><span class="n">firmware</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">OVMF</span><span class="o">.</span><span class="n">fd</span> <span class="o">--</span><span class="n">output</span> <span class="n">sev</span><span class="o">-</span><span class="n">snp</span><span class="o">.</span><span class="n">igvm</span> \
+          <span class="o">--</span><span class="n">cpucount</span> <span class="mi">4</span> <span class="n">sev</span><span class="o">-</span><span class="n">snp</span>
+</pre></div>
+</div>
+<p>To run a guest configured with the generated IGVM you need to add an
+<code class="docutils literal notranslate"><span class="pre">igvm-cfg</span></code> object and refer to it from the <code class="docutils literal notranslate"><span class="pre">-machine</span></code> parameter:</p>
+<p>Example (for AMD SEV):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">qemu</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">x86_64</span> \
+    <span class="o">&lt;</span><span class="n">other</span> <span class="n">parameters</span><span class="o">&gt;</span> \
+    <span class="o">-</span><span class="n">machine</span> <span class="o">...</span><span class="p">,</span><span class="n">confidential</span><span class="o">-</span><span class="n">guest</span><span class="o">-</span><span class="n">support</span><span class="o">=</span><span class="n">sev0</span><span class="p">,</span><span class="n">igvm</span><span class="o">-</span><span class="n">cfg</span><span class="o">=</span><span class="n">igvm0</span> \
+    <span class="o">-</span><span class="nb">object</span> <span class="n">sev</span><span class="o">-</span><span class="n">guest</span><span class="p">,</span><span class="nb">id</span><span class="o">=</span><span class="n">sev0</span><span class="p">,</span><span class="n">cbitpos</span><span class="o">=</span><span class="mi">47</span><span class="p">,</span><span class="n">reduced</span><span class="o">-</span><span class="n">phys</span><span class="o">-</span><span class="n">bits</span><span class="o">=</span><span class="mi">1</span> \
+    <span class="o">-</span><span class="nb">object</span> <span class="n">igvm</span><span class="o">-</span><span class="n">cfg</span><span class="p">,</span><span class="nb">id</span><span class="o">=</span><span class="n">igvm0</span><span class="p">,</span><span class="n">file</span><span class="o">=/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">sev</span><span class="o">-</span><span class="n">snp</span><span class="o">.</span><span class="n">igvm</span>
+</pre></div>
+</div>
+</section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>[1] AMD64 Architecture Programmer’s Manual, Volume 2: System Programming</dt><dd><p>Rev 3.43
+<a class="reference external" href="https://docs.amd.com/v/u/en-US/24593_3.43">https://docs.amd.com/v/u/en-US/24593_3.43</a></p>
+</dd>
+<dt>[2] <code class="docutils literal notranslate"><span class="pre">buildigvm</span></code> - A tool to build example IGVM files containing OVMF firmware</dt><dd><p><a class="reference external" href="https://gitlab.com/qemu-project/buildigvm">https://gitlab.com/qemu-project/buildigvm</a></p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="confidential-guest-support.html" class="btn btn-neutral float-left" title="Confidential Guest Support" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="nitro.html" class="btn btn-neutral float-right" title="AWS Nitro Enclaves" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, The QEMU Project Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+
+<!-- Empty para to force a blank line after "Built with Sphinx ..." -->
+<p></p>
+
+<p>This documentation is for QEMU version 11.0.50.</p>
+
+
+<p><a href="../about/license.html">QEMU and this manual are released under the
+GNU General Public License, version 2.</a></p>
+
+ 
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

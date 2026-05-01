@@ -1,0 +1,62 @@
+busybox
+=======
+
+busybox provides the userspace utilities (shell, coreutils,
+init, mount, etc.) bundled into the runtime VM's rootfs.
+synthmodem redistributes a compiled static busybox binary at:
+
+  vm/busybox/busybox
+
+This binary is taken from the Debian bookworm binary package
+`busybox-static` (Debian source package `busybox` version
+1.35.0-4, i386). It is used only when the slmodemd-pjsip backend
+is active (or during the slmodemd-pjsip phase of the auto
+backend) and runs inside QEMU; the native backend runs entirely
+on the host Node.js runtime and does not invoke it.
+
+Upstream project:  https://busybox.net/
+Upstream source:   https://git.busybox.net/busybox/
+Debian package:    https://packages.debian.org/bookworm/busybox-static
+
+License
+-------
+
+busybox is licensed under the GNU General Public License,
+version 2 only (GPL-2.0-only). Per the upstream LICENSE file:
+
+    BusyBox is distributed under version 2 of the General Public
+    License [...]. Version 2 is the only version of this license
+    which this version of BusyBox (or modified versions derived
+    from this one) may be distributed under.
+
+The "or later" option of the GPL does NOT apply to busybox 1.3.0
+or any later release, including the 1.35.0 release vendored
+here. The complete GPL-2.0 text is at `licenses/GPL-2.0.txt`.
+
+Individual busybox source files carry their own copyright
+headers; those headers are preserved verbatim in the vendored
+source tarball.
+
+Corresponding source
+--------------------
+
+GPL-2.0 §3(a) requires that the busybox binary redistributed in
+`vm/busybox/` travel with its complete corresponding source.
+That obligation is satisfied by committing the upstream Debian
+source set to this repository at:
+
+  vm/sources/busybox_1.35.0.orig.tar.bz2
+  vm/sources/busybox_1.35.0-4.debian.tar.xz
+  vm/sources/busybox_1.35.0-4.dsc
+
+SHA256 sums for all three files are pinned in
+`vm/sources/SHA256SUMS`. The top-level `COPYING` enumerates
+these paths in its GPL corresponding-source statement.
+
+Modifications from upstream
+---------------------------
+
+None. synthmodem redistributes the unmodified Debian binary
+package contents. If synthmodem ever ships a patched busybox,
+this notice must be updated to record the nature of the
+modifications, per GPL-2.0 §2(a).

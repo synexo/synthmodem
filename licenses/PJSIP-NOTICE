@@ -1,0 +1,53 @@
+PJSIP (pjproject)
+=================
+
+PJSIP is a free and open-source multimedia communication library
+by Teluu Ltd. and contributors. It implements SIP, SDP, RTP, STUN,
+TURN, and ICE.
+
+synthmodem redistributes a compiled binary built from PJSIP version
+2.15.1 inside `vm/prebuilt/` (specifically, the `d-modem` helper that
+links against PJSIP statically). The source tarball is vendored at
+`vm/sources/pjproject-2.15.1.tar.gz` and is byte-identical to the
+upstream release tag:
+
+  https://github.com/pjsip/pjproject/archive/refs/tags/2.15.1.tar.gz
+
+Upstream project:  https://github.com/pjsip/pjproject
+Upstream license:  https://docs.pjsip.org/en/latest/overview/license.html
+
+License
+-------
+
+PJSIP is dual-licensed:
+
+  1. GNU General Public License, version 2 (or later), as published
+     by the Free Software Foundation.
+  2. A commercial license from Teluu Ltd.
+
+synthmodem redistributes PJSIP under the GPL-2.0-or-later option.
+The complete GPL-2.0 text that applies is the same one that covers
+synthmodem itself, at `licenses/GPL-2.0.txt`. PJSIP's upstream
+COPYING file is verbatim identical to that text.
+
+Each PJSIP source file carries its own copyright header (typically
+"Copyright (C) 2003-xxxx Teluu Inc. (http://www.teluu.com)") and
+license grant. Those headers are preserved in the vendored tarball.
+
+Corresponding source
+--------------------
+
+GPL-2.0 §3(a) requires that the PJSIP binary redistributed in
+`vm/prebuilt/` travel with its complete corresponding source. That
+obligation is satisfied by committing the pinned source tarball to
+this repository at `vm/sources/pjproject-2.15.1.tar.gz`. See
+`vm/sources/README.md` and the top-level `COPYING` for the full
+corresponding-source statement.
+
+Our build configuration
+-----------------------
+
+synthmodem customizes the PJSIP build only through a compile-time
+configuration file, `vm/pjsip/config_site.h` (currently empty, matching
+what D-Modem ships). No PJSIP source files are modified. See
+`vm/pjsip/UPSTREAM.txt` for the build recipe.

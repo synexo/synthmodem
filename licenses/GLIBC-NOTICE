@@ -1,0 +1,70 @@
+GNU C Library (glibc)
+=====================
+
+The GNU C Library (glibc) is the standard C library used by the
+runtime VM. synthmodem redistributes a subset of the compiled
+glibc shared libraries — `ld-linux.so.2`, `libc.so.6`, and
+`libm.so.6` — at `vm/libc/`, sourced from the Debian bookworm
+binary package `libc6` (glibc 2.36-9+deb12u13, i386).
+
+These libraries are loaded inside the QEMU guest and linked
+dynamically against the in-VM helpers (`d-modem`, `modemd-ctrl`,
+`modemd-tunnel`, `slmodemd`, `pjsip-test-peer`). They are used
+only when the slmodemd-pjsip backend is active (or during the
+slmodemd-pjsip phase of the auto backend); the native backend
+runs entirely on the host Node.js runtime and does not load them.
+
+Upstream project:  https://www.gnu.org/software/libc/
+Upstream source:   https://sourceware.org/git/glibc.git
+Debian package:    https://packages.debian.org/bookworm/libc6
+
+License
+-------
+
+glibc is licensed under the GNU Lesser General Public License,
+version 2.1 or later (LGPL-2.1-or-later). The complete LGPL-2.1
+text is at `licenses/LGPL-2.1.txt`.
+
+The library distribution also includes a small number of files
+under permissive third-party licenses (BSD variants from the
+Regents of the University of California, the WIDE Project, and
+Sun Microsystems' fdlibm, among others). Those files retain
+their own copyright headers in the upstream source tree at
+`vm/sources/glibc_2.36.orig.tar.xz` (see the upstream `LICENSES`
+file at the root of that tarball). Their permissive terms are
+compatible with redistribution under LGPL-2.1-or-later.
+
+LGPL §6 — relinking
+-------------------
+
+LGPL-2.1 §6 requires that recipients of an LGPL'd library be able
+to relink the application against a modified version of the
+library. synthmodem satisfies this in the standard way for shared
+libraries: glibc is loaded as a dynamic shared object (`.so`) by
+the runtime VM, so a recipient may substitute a modified
+`libc.so.6`, `libm.so.6`, or `ld-linux.so.2` at `vm/libc/` without
+rebuilding any of the binaries that depend on it. No static
+linking of glibc into a synthmodem-distributed binary occurs.
+
+Corresponding source
+--------------------
+
+LGPL-2.1 §4 incorporates the GPL-2.0 source-distribution
+obligations (see GPL-2.0 §3(a)). That obligation is satisfied by
+committing the upstream Debian source set to this repository at:
+
+  vm/sources/glibc_2.36.orig.tar.xz
+  vm/sources/glibc_2.36-9+deb12u13.debian.tar.xz
+  vm/sources/glibc_2.36-9+deb12u13.dsc
+
+SHA256 sums for all three files are pinned in
+`vm/sources/SHA256SUMS`. The top-level `COPYING` enumerates these
+paths in its GPL corresponding-source statement.
+
+Modifications from upstream
+---------------------------
+
+None. synthmodem redistributes the unmodified Debian binary
+package contents. If synthmodem ever ships a patched glibc, this
+notice must be updated to record the nature of the modifications,
+per LGPL-2.1 §2.

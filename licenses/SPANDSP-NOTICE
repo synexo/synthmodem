@@ -1,0 +1,140 @@
+spandsp
+=======
+
+spandsp is a free software collection of telephony signal processing
+DSP routines, originally developed by Steve Underwood and now
+maintained at https://github.com/freeswitch/spandsp.
+
+Earlier development phases of synthmodem vendored spandsp directly
+as compiled native addons (`src/native/`). That tree was removed in
+cleanup-phase-2; no spandsp C/C++ source is shipped today. However,
+several of synthmodem's pure-JavaScript DSP modules contain code
+that was ported from spandsp source — algorithms, state machines,
+filter coefficient tables, and named constants reimplemented in
+JavaScript with documented adaptations. Those JS modules are
+therefore derivative works of spandsp.
+
+Upstream project:  https://github.com/freeswitch/spandsp
+Original author:   Steve Underwood <steveu@coppice.org>
+Upstream copyright: Copyright (C) 2003-2009 Steve Underwood
+
+Files containing ported code
+----------------------------
+
+The following synthmodem source files contain code derived from
+spandsp. Each file's header records the specific upstream source
+file(s) used as the basis for the port and what was preserved,
+adapted, or omitted relative to upstream.
+
+  * src/dsp/V8Sequencer.js
+      Faithful port of spandsp's `src/v8.c` — the V.8 negotiation
+      sample-accurate state machine.
+
+  * src/dsp/protocols/V22Demodulator.js
+      Faithful port of spandsp's `src/v22bis_rx.c` — the V.22 / V.22bis
+      receive pipeline, including the bandpass-RRC filter, AGC, Costas
+      carrier tracking, T/2 LMS equalizer, Gardner symbol-sync
+      detector, and the RX training state machine. Includes inline
+      citations to specific upstream line numbers throughout.
+
+  * src/dsp/protocols/V22RxRRC.js
+      Direct port of the bandpass-RRC filter coefficient tables from
+      spandsp's `src/v22bis_rx_1200_rrc.h` and
+      `src/v22bis_rx_2400_rrc.h`. Numeric values verbatim.
+
+  * src/dsp/protocols/V22Common.js
+      The `V22Scrambler` class is a direct port of spandsp's
+      `scramble()` / `descramble()` functions from `src/v22bis_tx.c`
+      and `src/v22bis_rx.c`. The remainder of this file
+      (constants, pulse-shape helper) is independently authored
+      from the V.22bis specification.
+
+  * src/dsp/protocols/V22.js
+      The V.22bis modulator and answerer-side handshake state machine
+      are modelled after spandsp's `src/v22bis_tx.c` (and reference
+      `src/v22bis_rx.c` for the cross-side state transitions).
+      Several specific design choices, named constants, and per-line
+      formula references are taken from upstream and cited inline.
+      (synthmodem's S1 detection uses an independently-developed
+      spectral test in place of spandsp's symbol-stream-based
+      detector; that variation is documented in the file header.)
+
+  * src/dsp/protocols/FskCommon.js
+      The `CoherentFskDemodulator` class is a faithful port of
+      spandsp's `src/fsk.c` receive logic (quadrature DDS correlators,
+      sliding dot-product matched filter, central-bit-stability UART
+      framing). The `FskModulator` class implements spandsp's
+      fractional-baud accumulator approach (`src/fsk.c` `fsk_tx`)
+      with constants taken from spandsp's `preset_fsk_specs` for V.21,
+      Bell 103, and V.23.
+
+License
+-------
+
+spandsp is distributed under the GNU Lesser General Public License,
+version 2.1 (LGPL-2.1). The complete LGPL-2.1 text is at
+`licenses/LGPL-2.1.txt`.
+
+LGPL-2.1 §3 election to GPL-2.0-or-later
+----------------------------------------
+
+Per LGPL-2.1 §3, a recipient of an LGPL-2.1-licensed work may opt
+to apply the terms of the ordinary GNU General Public License,
+version 2 (or, at the recipient's option, any later version) to
+that copy. synthmodem exercises this election for all spandsp-
+derived code, so that the entire synthmodem distribution can ship
+under a single license (GPL-2.0-or-later) rather than mixing GPL
+and LGPL terms.
+
+The election is recorded in the file headers of the files listed
+above. Once this election is made, LGPL-2.1 §3 makes it
+irreversible for the copy in question.
+
+The complete GPL-2.0 text is at `licenses/GPL-2.0.txt`.
+
+Modifications from upstream
+---------------------------
+
+By their nature, the ports listed above are not byte-identical
+copies of the spandsp source. The differences include:
+
+  * Translation from C to JavaScript (with IEEE float arithmetic
+    in place of spandsp's int16/fixed-point in some files; spandsp
+    has a `SPANDSP_USE_FIXED_POINT` build switch and we follow the
+    floating-point alternate path).
+  * UART framing integrated into the demodulator classes
+    (spandsp's consumers handle UART externally via a `put_bit`
+    callback; our async data interface emits `Buffer` events).
+  * Carrier-presence gating exposed as a constructor flag for
+    A/B testing (spandsp uses an internal `signal_present` flag).
+  * S1 detection in V.22bis replaced with a spectral test on the
+    raw input audio (spandsp uses a symbol-stream-based detector;
+    see V22.js header for the rationale).
+  * V.22bis training state machine integrated with synthmodem's
+    sample-accurate handshake driver in V22.js.
+
+The per-file headers in each ported module document the
+adaptations specific to that module in greater detail. These
+headers, taken together with this notice, satisfy LGPL-2.1 §1's
+requirement (now §1 of GPL-2.0 by virtue of the §3 election)
+that modified files carry prominent notices stating that they
+have been changed and the date of any change.
+
+Corresponding source
+--------------------
+
+The synthmodem repository IS the corresponding source for the
+JavaScript ports. The .js files listed above are themselves the
+distributable source form — there is no separate compilation step
+or bundled binary derived from them. GPL-2.0 §3(a) is satisfied by
+publishing the synthmodem repository.
+
+We do NOT vendor the spandsp upstream C source tree. That source
+remains available from the upstream project at
+https://github.com/freeswitch/spandsp. Vendoring the upstream is
+not required for compliance: we do not ship any compiled spandsp
+binary, and the obligation to provide corresponding source attaches
+to what we distribute, not to the historical reference material
+used during development. Recipients who wish to compare the ports
+to the upstream may use the inline file/line references in each
+ported module and fetch the corresponding spandsp source directly.

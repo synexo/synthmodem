@@ -1,0 +1,332 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iommu-testdev — IOMMU test device for bare-metal testing &mdash; QEMU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=f5127f15" />
+      <link rel="stylesheet" type="text/css" href="../_static/theme_overrides.css?v=b3ae9cc8" />
+
+  
+    <link rel="shortcut icon" href="../_static/qemu_32x32.png"/>
+      <script src="../_static/jquery.js?v=8dae8fb0"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3b5cce75"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/custom.js?v=2ab9f71d"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Developer Information" href="../devel/index.html" />
+    <link rel="prev" title="ASPEED Interrupt Controller" href="aspeed-intc.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #802400" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QEMU
+              <img src="../_static/qemu_128x128.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about/index.html">About QEMU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../system/index.html">System Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/index.html">User Mode Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interop/index.html">System Emulation Management and Interoperability</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">System Emulation Guest Hardware Specifications</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pci-ids.html">PCI IDs for QEMU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pci-serial.html">QEMU PCI serial devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pci-testdev.html">QEMU PCI test device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppc-xive.html">POWER9 XIVE interrupt controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppc-spapr-xive.html">XIVE for sPAPR (pseries machines)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppc-spapr-numa.html">NUMA mechanics for sPAPR (pseries machines)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppc-spapr-numa.html#how-the-pseries-linux-guest-calculates-numa-distances">How the pseries Linux guest calculates NUMA distances</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppc-spapr-numa.html#pseries-numa-mechanics">pseries NUMA mechanics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ppc-spapr-numa.html#legacy-5-1-and-older-pseries-numa-mechanics">Legacy (5.1 and older) pseries NUMA mechanics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acpi_hw_reduced_hotplug.html">QEMU and ACPI BIOS Generic Event Device interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tpm.html">QEMU TPM Device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acpi_hest_ghes.html">APEI tables generating and CPER record</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acpi_cpu_hotplug.html">QEMU&lt;-&gt;ACPI BIOS CPU hotplug interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acpi_mem_hotplug.html">QEMU&lt;-&gt;ACPI BIOS memory hotplug interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acpi_pci_hotplug.html">QEMU&lt;-&gt;ACPI BIOS PCI hotplug interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acpi_nvdimm.html">QEMU&lt;-&gt;ACPI BIOS NVDIMM interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acpi_erst.html">ACPI ERST DEVICE</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sev-guest-firmware.html">QEMU/Guest Firmware Interface for AMD SEV and SEV-ES</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fw_cfg.html">QEMU Firmware Configuration (fw_cfg) Device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fsi.html">IBM’s Flexible Service Interface (FSI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vmw_pvscsi-spec.html">VMWare PVSCSI Device Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="edu.html">EDU device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ivshmem-spec.html">Device Specification for Inter-VM shared memory device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pvpanic.html">PVPANIC DEVICE</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spdm.html">QEMU Security Protocols and Data Models (SPDM) Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="standard-vga.html">QEMU Standard VGA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virt-ctlr.html">Virtual System Controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vmcoreinfo.html">VMCoreInfo device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vmgenid.html">Virtual Machine Generation ID Device</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rapl-msr.html">RAPL MSR support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rocker.html">Rocker Network Switch Register Programming Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="riscv-iommu.html">RISC-V IOMMU support for RISC-V machines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="riscv-aia.html">RISC-V AIA support for RISC-V machines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="aspeed-intc.html">ASPEED Interrupt Controller</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">iommu-testdev — IOMMU test device for bare-metal testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#key-features">Key Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#status">Status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#device-interface">Device Interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#translation-setup-workflow">Translation Setup Workflow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dma-operation-flow">DMA Operation Flow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#running-the-qtest">Running the qtest</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#instantiation">Instantiation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#limitations">Limitations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#see-also">See also</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../devel/index.html">Developer Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #802400" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QEMU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">System Emulation Guest Hardware Specifications</a></li>
+      <li class="breadcrumb-item active">iommu-testdev — IOMMU test device for bare-metal testing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="https://gitlab.com/qemu-project/qemu/-/blob/master/docs/specs/iommu-testdev.rst">View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="iommu-testdev-iommu-test-device-for-bare-metal-testing">
+<h1>iommu-testdev — IOMMU test device for bare-metal testing<a class="headerlink" href="#iommu-testdev-iommu-test-device-for-bare-metal-testing" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">iommu-testdev</span></code> is a minimal, test-only PCI device designed to exercise
+IOMMU translation (such as ARM SMMUv3) without requiring firmware or a guest
+OS. Tests can populate IOMMU translation tables with known values and trigger
+DMA operations that flow through the IOMMU translation path. It is <strong>not</strong> a
+faithful PCIe endpoint and must be considered a QEMU-internal test vehicle.</p>
+</section>
+<section id="key-features">
+<h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Bare-metal IOMMU testing</strong>: No guest kernel or firmware required</p></li>
+<li><p><strong>Configurable DMA attributes</strong>: Supports address space configuration via
+MMIO registers</p></li>
+<li><p><strong>Deterministic verification</strong>: Write-then-read DMA pattern with automatic
+result checking</p></li>
+</ul>
+</section>
+<section id="status">
+<h2>Status<a class="headerlink" href="#status" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Location: <code class="docutils literal notranslate"><span class="pre">hw/misc/iommu-testdev.c</span></code></p></li>
+<li><p>Header: <code class="docutils literal notranslate"><span class="pre">include/hw/misc/iommu-testdev.h</span></code></p></li>
+<li><p>Build guard: <code class="docutils literal notranslate"><span class="pre">CONFIG_IOMMU_TESTDEV</span></code></p></li>
+</ul>
+</section>
+<section id="device-interface">
+<h2>Device Interface<a class="headerlink" href="#device-interface" title="Link to this heading"></a></h2>
+<p>The device exposes a single PCI BAR0 with 32-bit MMIO registers:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_TRIGGERING</span></code> (0x00): Read triggers DMA and consumes
+the armed request</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_GVA_LO</span></code> (0x04): DMA IOVA bits [31:0]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_GVA_HI</span></code> (0x08): DMA IOVA bits [63:32]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_GPA_LO</span></code> (0x1C): DMA GPA bits [31:0] for readback validation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_GPA_HI</span></code> (0x20): DMA GPA bits [63:32] for readback validation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_LEN</span></code> (0x0C): DMA transfer length</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_RESULT</span></code> (0x10): DMA result
+(0=success, 0xffffffff=idle, 0xfffffffe=armed)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_DBELL</span></code> (0x14): Write 1 to arm DMA, write 0 to disarm.
+Arming only marks the request and sets BUSY (no latch/check), but it
+provides an explicit gate for qtests and leaves room for async/latching.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ITD_REG_DMA_ATTRS</span></code> (0x18): DMA attributes which shadow some fields in
+MemTxAttrs:</p>
+<ul>
+<li><p>bit[0]: secure (1=Secure, 0=Non-Secure)</p></li>
+<li><p>bits[2:1]: ArmSecuritySpace (0=Secure, 1=Non-Secure)</p></li>
+<li><p>bit[3]: space_valid (1=space is valid, 0=ignore space and default to Non-Secure)
+<code class="docutils literal notranslate"><span class="pre">space</span></code> field in MemTxAttrs is consumed only when <code class="docutils literal notranslate"><span class="pre">space_valid</span></code> is set.
+For Secure/Non-Secure, <code class="docutils literal notranslate"><span class="pre">secure</span></code> and <code class="docutils literal notranslate"><span class="pre">space</span></code> must match; mismatches
+return <code class="docutils literal notranslate"><span class="pre">ITD_DMA_ERR_BAD_ATTRS</span></code>. Other bits are reserved but can be wired
+up easily if future tests need to pass extra attributes.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="translation-setup-workflow">
+<h2>Translation Setup Workflow<a class="headerlink" href="#translation-setup-workflow" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">iommu-testdev</span></code> never builds SMMU/AMD-Vi/RISC-V IOMMU structures on its own.
+Architecture-specific construction lives entirely in qtest/libqos helpers.
+Those helpers populate guest memory with page tables/architecture-specific
+structures and program the emulated IOMMU registers directly. See the
+<code class="docutils literal notranslate"><span class="pre">qsmmu_setup_and_enable_translation()</span></code> function in
+<code class="docutils literal notranslate"><span class="pre">tests/qtest/libqos/qos-smmuv3.c</span></code> for an example of how SMMUv3 translation
+is set up for this device.</p>
+</section>
+<section id="dma-operation-flow">
+<h2>DMA Operation Flow<a class="headerlink" href="#dma-operation-flow" title="Link to this heading"></a></h2>
+<p>Arming semantics:</p>
+<ul class="simple">
+<li><p>Writing <code class="docutils literal notranslate"><span class="pre">DMA_DBELL</span></code> with bit0=1 marks the request armed and sets
+<code class="docutils literal notranslate"><span class="pre">DMA_RESULT</span></code> to BUSY. It does not latch GVA/LEN/ATTRS; values are sampled
+when <code class="docutils literal notranslate"><span class="pre">DMA_TRIGGERING</span></code> is read.</p></li>
+<li><p>Writing <code class="docutils literal notranslate"><span class="pre">DMA_DBELL</span></code> with bit0=0 disarms the request and sets
+<code class="docutils literal notranslate"><span class="pre">DMA_RESULT</span></code> to IDLE.</p></li>
+<li><p>Reading <code class="docutils literal notranslate"><span class="pre">DMA_TRIGGERING</span></code> consumes the armed request and clears the armed
+state, even on error.</p></li>
+</ul>
+<p>The flow would be split into these steps, mainly for timing control and
+debuggability: qtests can easily exercise and assert distinct paths
+(NOT_ARMED, BAD_LEN, TX/RD failures, mismatch) instead of having all side
+effects hidden behind a single step:
+1. Test programs IOMMU translation tables
+2. Test configures DMA IOVA (GVA_LO/HI), GPA for readback, length, and attributes
+3. Test writes 1 to DMA_DBELL to arm the operation
+4. Test reads DMA_TRIGGERING to execute DMA
+5. Test polls DMA_RESULT:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>0x00000000: Success</p></li>
+<li><p>0xFFFFFFFE: Armed (waiting for trigger). DMA runs synchronously, so
+BUSY is not observed once the trigger read completes.</p></li>
+<li><p>0xDEAD0006: Bad attrs (secure/space mismatch for S/NS)</p></li>
+<li><p>0xDEAD000X: Various error codes</p></li>
+</ul>
+</div></blockquote>
+<p>The device performs a write-then-read sequence using a known pattern
+(0x12345678) and verifies data integrity automatically.</p>
+</section>
+<section id="running-the-qtest">
+<h2>Running the qtest<a class="headerlink" href="#running-the-qtest" title="Link to this heading"></a></h2>
+<p>The SMMUv3 test suite uses this device and covers multiple translation modes:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">build</span>
+<span class="n">QTEST_QEMU_BINARY</span><span class="o">=./</span><span class="n">qemu</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">aarch64</span> \\
+    <span class="o">./</span><span class="n">tests</span><span class="o">/</span><span class="n">qtest</span><span class="o">/</span><span class="n">iommu</span><span class="o">-</span><span class="n">smmuv3</span><span class="o">-</span><span class="n">test</span> <span class="o">--</span><span class="n">tap</span> <span class="o">-</span><span class="n">k</span>
+</pre></div>
+</div>
+<p>This test suite exercises:</p>
+<ul class="simple">
+<li><p>Stage 1 only translation</p></li>
+<li><p>Stage 2 only translation</p></li>
+<li><p>Nested (Stage 1 + Stage 2) translation</p></li>
+</ul>
+</section>
+<section id="instantiation">
+<h2>Instantiation<a class="headerlink" href="#instantiation" title="Link to this heading"></a></h2>
+<p>The device is not wired into any board by default. Tests instantiate it
+via QEMU command line:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">device</span> <span class="n">iommu</span><span class="o">-</span><span class="n">testdev</span>
+</pre></div>
+</div>
+<p>For ARM platforms with SMMUv3:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">M</span> <span class="n">virt</span><span class="p">,</span><span class="n">iommu</span><span class="o">=</span><span class="n">smmuv3</span> <span class="o">-</span><span class="n">device</span> <span class="n">iommu</span><span class="o">-</span><span class="n">testdev</span>
+</pre></div>
+</div>
+<p>When the IOMMU sits on the same PCI root complex (<code class="docutils literal notranslate"><span class="pre">pci.0</span></code>), the device is
+placed behind it automatically. For other PCI topologies, specify the bus
+explicitly.</p>
+</section>
+<section id="limitations">
+<h2>Limitations<a class="headerlink" href="#limitations" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>No realistic PCIe enumeration, MSI/MSI-X, or interrupt handling</p></li>
+<li><p>No ATS/PRI support</p></li>
+<li><p>No actual device functionality beyond DMA test pattern</p></li>
+<li><p>Test-only; not suitable for production or machine realism</p></li>
+<li><p>Address space support (Secure/Root/Realm) is architecture-dependent and
+gated by <code class="docutils literal notranslate"><span class="pre">space_valid</span></code></p></li>
+<li><p>Readback uses the programmed GPA and reads via system memory, avoiding a
+second IOMMU access for the readback step</p></li>
+</ul>
+</section>
+<section id="see-also">
+<h2>See also<a class="headerlink" href="#see-also" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/qtest/iommu-smmuv3-test.c</span></code> — SMMUv3 test suite</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tests/qtest/libqos/qos-smmuv3.{c,h}</span></code> — SMMUv3 test library</p></li>
+<li><p>SMMUv3 emulation: <code class="docutils literal notranslate"><span class="pre">hw/arm/smmu*</span></code></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="aspeed-intc.html" class="btn btn-neutral float-left" title="ASPEED Interrupt Controller" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../devel/index.html" class="btn btn-neutral float-right" title="Developer Information" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, The QEMU Project Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+
+<!-- Empty para to force a blank line after "Built with Sphinx ..." -->
+<p></p>
+
+<p>This documentation is for QEMU version 11.0.50.</p>
+
+
+<p><a href="../about/license.html">QEMU and this manual are released under the
+GNU General Public License, version 2.</a></p>
+
+ 
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

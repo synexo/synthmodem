@@ -1,0 +1,42 @@
+QEMU
+====
+
+QEMU is a generic and open source machine emulator and virtualizer.
+
+synthmodem redistributes a prebuilt QEMU binary in the Windows
+distribution at win/qemu/. The version distributed is QEMU 11.0.50.
+The corresponding source tarball is vendored at:
+
+  win/qemu-source/qemu-master.zip
+
+This tarball corresponds exactly to the source from which the
+distributed QEMU binary was built.
+
+Upstream project:  https://www.qemu.org/
+Upstream source:   https://gitlab.com/qemu-project/qemu
+
+License
+-------
+
+QEMU is licensed under the GNU General Public License, version 2
+(GPL-2.0). The complete GPL-2.0 text is at licenses/GPL-2.0.txt,
+which is the same license that covers synthmodem itself.
+
+Individual QEMU source files carry their own copyright headers;
+those headers are preserved in the vendored source tarball.
+The QEMU project's own top-level COPYING file (GPL-2.0) is included
+verbatim in the source tarball.
+
+This component is included only in the Windows distribution
+(win/qemu/). It is not part of the Linux distribution.
+
+Corresponding source
+--------------------
+
+GPL-2.0 §3(a) requires that the QEMU binary redistributed in
+win/qemu/ travel with its complete corresponding source. That
+obligation is satisfied by committing the source tarball to this
+repository at win/qemu-source/qemu-master.zip. The source tarball
+corresponds exactly to the binary: no QEMU source files are
+modified by synthmodem. The top-level COPYING enumerates this
+path in its GPL corresponding-source statement.

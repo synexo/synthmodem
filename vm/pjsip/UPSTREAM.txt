@@ -1,0 +1,60 @@
+# Upstream pin for vm/pjsip/
+#
+# PJSIP is consumed as an upstream source tarball (see
+# vm/sources/pjproject-2.15.1.tar.gz) plus our synthmodem-specific
+# build customization that lives in this directory. We do NOT vendor
+# the unpacked PJSIP source tree in git — that would add ~130 MB of
+# files that are all pristine upstream. The tarball in vm/sources/ IS
+# the corresponding source for the PJSIP binary we redistribute in
+# vm/prebuilt/.
+#
+# This UPSTREAM.txt documents which upstream release we build from and
+# where to fetch it. scripts/fetch-vm-sources.sh downloads and verifies
+# the tarball by SHA256.
+#
+# PJSIP is GPLv2 (or commercial — we use the GPLv2 edition). See
+# licenses/PJSIP-GPLv2.txt for the license text.
+
+upstream-project: pjsip/pjproject
+upstream-release: 2.15.1
+upstream-url:     https://github.com/pjsip/pjproject/archive/refs/tags/2.15.1.tar.gz
+tarball-sha256:   8f3bd99caf003f96ed8038b8a36031eb9d8cd9eaea1eaff7e01c2eef6bd55706
+tarball-bytes:    10425868
+vendored-at:      2026-04-23
+
+# Verified at vendor time (2026-04-23):
+#   - Tarball unpacks to a single top-level directory: pjproject-2.15.1/
+#   - Every C/C++/header file in that tree is byte-identical to the
+#     pjproject-2.15.1/ subtree bundled in synexo/D-Modem (the D-Modem
+#     branch we derive d-modem.c from). D-Modem does not patch PJSIP.
+#   - D-Modem ships with an empty pjlib/include/pj/config_site.h. We
+#     replicate that default. See config_site.h in this directory.
+#
+# GitHub note on tarball stability:
+#   This URL is GitHub's auto-generated archive for a release tag. The
+#   tarball is re-generated from the tag on demand but has historically
+#   been bit-stable for pjproject. The pinned SHA256 above is our
+#   ground truth; if GitHub ever silently changes its archive format
+#   and the hash stops matching, scripts/fetch-vm-sources.sh will
+#   refuse the download and this file will need a manual audit. Keep
+#   a verified copy in vm/sources/ (committed to git); that copy is
+#   what any fresh clone actually uses.
+
+# Build configuration:
+#   Our synthmodem-specific customization of the PJSIP build lives in
+#   pjlib/include/pj/config_site.h inside the extracted source tree.
+#   We override the upstream empty file by copying vm/pjsip/config_site.h
+#   into place before running ./configure.
+#
+#   See scripts/build-vm-binaries.sh (M-PJSIP) for the exact build
+#   sequence. Summary:
+#     1. tar -xzf vm/sources/pjproject-2.15.1.tar.gz -C <build-dir>
+#     2. cp vm/pjsip/config_site.h <build-dir>/pjproject-2.15.1/pjlib/include/pj/config_site.h
+#     3. cd <build-dir>/pjproject-2.15.1 && ./configure --prefix=... --disable-video
+#     4. make && make install
+#
+# Corresponding source obligation:
+#   GPLv2 §3(a) requires that the PJSIP binary we ship in
+#   vm/prebuilt/ travel with its complete source. That obligation is
+#   satisfied by vm/sources/pjproject-2.15.1.tar.gz being committed to
+#   this repository. See vm/sources/README.md and COPYING.

@@ -1,0 +1,3018 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>vfio-user Protocol Specification &mdash; QEMU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=f5127f15" />
+      <link rel="stylesheet" type="text/css" href="../_static/theme_overrides.css?v=b3ae9cc8" />
+
+  
+    <link rel="shortcut icon" href="../_static/qemu_32x32.png"/>
+      <script src="../_static/jquery.js?v=8dae8fb0"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3b5cce75"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/custom.js?v=2ab9f71d"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Vhost-user Protocol" href="vhost-user.html" />
+    <link rel="prev" title="QEMU Storage Daemon QMP Reference Manual" href="qemu-storage-daemon-qmp-ref.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #802400" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QEMU
+              <img src="../_static/qemu_128x128.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about/index.html">About QEMU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../system/index.html">System Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/index.html">User Mode Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">Tools</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">System Emulation Management and Interoperability</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="barrier.html">Barrier client protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bitmaps.html">Dirty Bitmaps and Incremental Backup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dbus.html">D-Bus</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dbus-vmstate.html">D-Bus VMState</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dbus-display.html">D-Bus display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="live-block-operations.html">Live Block Device Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nbd.html">QEMU NBD protocol support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parallels.html">Parallels Expandable Image File Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="prl-xml.html">Parallels Disk Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qcow2.html">Qcow2 Image File Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qed_spec.html">QED Image File Format Specification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pr-helper.html">Persistent reservation helper protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qmp-spec.html">QEMU Machine Protocol Specification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-ga.html">QEMU Guest Agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-ga-ref.html">QEMU Guest Agent Protocol Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-qmp-ref.html">QEMU QMP Reference Manual</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-storage-daemon-qmp-ref.html">QEMU Storage Daemon QMP Reference Manual</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">vfio-user Protocol Specification</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-device-model">VFIO Device Model</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#region-i-o-via-file-descriptors">Region I/O via file descriptors</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#client-memory-access">Client memory access</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#client-server-interactions">Client/server interactions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#socket">Socket</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#authentication">Authentication</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#command-concurrency">Command Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#socket-disconnection-behavior">Socket Disconnection Behavior</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#security-considerations">Security Considerations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#request-retry-and-response-timeout">Request Retry and Response Timeout</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#message-sizes">Message sizes</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#protocol-specification">Protocol Specification</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#commands">Commands</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#header">Header</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-version"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_VERSION</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-dma-map"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-dma-unmap"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_UNMAP</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-device-get-info"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_INFO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-device-get-region-info"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_INFO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-device-get-region-io-fds"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_IO_FDS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-device-get-irq-info"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_IRQ_INFO</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-device-set-irqs"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQS</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-region-read"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_READ</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-region-write"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-dma-read"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_READ</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-dma-write"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_WRITE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-device-reset"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_RESET</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-region-write-multi"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE_MULTI</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-device-feature"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_FEATURE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-mig-data-read"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_READ</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vfio-user-mig-data-write"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_WRITE</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#appendices">Appendices</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#unused-vfio-ioctl-commands">Unused VFIO <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> commands</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#backend-program-conventions">Backend Program Conventions</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vhost-user.html">Vhost-user Protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost-user-gpu.html">Vhost-user-gpu Protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost-vdpa.html">Vhost-vdpa Protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio-balloon-stats.html">Virtio balloon memory statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vnc-ledstate-pseudo-encoding.html">VNC LED state Pseudo-encoding</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../specs/index.html">System Emulation Guest Hardware Specifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../devel/index.html">Developer Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #802400" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QEMU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">System Emulation Management and Interoperability</a></li>
+      <li class="breadcrumb-item active">vfio-user Protocol Specification</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="https://gitlab.com/qemu-project/qemu/-/blob/master/docs/interop/vfio-user.rst">View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="vfio-user-protocol-specification">
+<h1><a class="toc-backref" href="#id32" role="doc-backlink">vfio-user Protocol Specification</a><a class="headerlink" href="#vfio-user-protocol-specification" title="Link to this heading"></a></h1>
+<nav class="contents" id="table-of-contents">
+<p class="topic-title">Table of Contents</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#vfio-user-protocol-specification" id="id32">vfio-user Protocol Specification</a></p>
+<ul>
+<li><p><a class="reference internal" href="#introduction" id="id33">Introduction</a></p></li>
+<li><p><a class="reference internal" href="#overview" id="id34">Overview</a></p>
+<ul>
+<li><p><a class="reference internal" href="#vfio-device-model" id="id35">VFIO Device Model</a></p>
+<ul>
+<li><p><a class="reference internal" href="#connection-initiation" id="id36">Connection Initiation</a></p></li>
+<li><p><a class="reference internal" href="#device-information" id="id37">Device Information</a></p></li>
+<li><p><a class="reference internal" href="#region-information" id="id38">Region Information</a></p>
+<ul>
+<li><p><a class="reference internal" href="#region-capabilities" id="id39">Region Capabilities</a></p></li>
+<li><p><a class="reference internal" href="#sparse-regions" id="id40">Sparse Regions</a></p></li>
+<li><p><a class="reference internal" href="#device-specific-regions" id="id41">Device-Specific Regions</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#region-i-o-via-file-descriptors" id="id42">Region I/O via file descriptors</a></p>
+<ul>
+<li><p><a class="reference internal" href="#interrupts" id="id43">Interrupts</a></p></li>
+<li><p><a class="reference internal" href="#device-read-and-write" id="id44">Device Read and Write</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#client-memory-access" id="id45">Client memory access</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#client-server-interactions" id="id46">Client/server interactions</a></p>
+<ul>
+<li><p><a class="reference internal" href="#socket" id="id47">Socket</a></p></li>
+<li><p><a class="reference internal" href="#authentication" id="id48">Authentication</a></p></li>
+<li><p><a class="reference internal" href="#command-concurrency" id="id49">Command Concurrency</a></p></li>
+<li><p><a class="reference internal" href="#socket-disconnection-behavior" id="id50">Socket Disconnection Behavior</a></p>
+<ul>
+<li><p><a class="reference internal" href="#server-disconnection" id="id51">Server Disconnection</a></p></li>
+<li><p><a class="reference internal" href="#client-disconnection" id="id52">Client Disconnection</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#security-considerations" id="id53">Security Considerations</a></p></li>
+<li><p><a class="reference internal" href="#request-retry-and-response-timeout" id="id54">Request Retry and Response Timeout</a></p></li>
+<li><p><a class="reference internal" href="#message-sizes" id="id55">Message sizes</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#protocol-specification" id="id56">Protocol Specification</a></p>
+<ul>
+<li><p><a class="reference internal" href="#commands" id="id57">Commands</a></p></li>
+<li><p><a class="reference internal" href="#header" id="id58">Header</a></p></li>
+<li><p><a class="reference internal" href="#vfio-user-version" id="id59"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_VERSION</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#request" id="id60">Request</a></p></li>
+<li><p><a class="reference internal" href="#reply" id="id61">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-dma-map" id="id62"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id2" id="id63">Request</a></p></li>
+<li><p><a class="reference internal" href="#id3" id="id64">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-dma-unmap" id="id65"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_UNMAP</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id4" id="id66">Request</a></p></li>
+<li><p><a class="reference internal" href="#id5" id="id67">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-device-get-info" id="id68"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_INFO</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id6" id="id69">Request</a></p></li>
+<li><p><a class="reference internal" href="#id7" id="id70">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-device-get-region-info" id="id71"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_INFO</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id8" id="id72">Request</a></p></li>
+<li><p><a class="reference internal" href="#id9" id="id73">Reply</a></p>
+<ul>
+<li><p><a class="reference internal" href="#vfio-region-capabilities" id="id74">VFIO region capabilities</a></p></li>
+<li><p><a class="reference internal" href="#vfio-cap-header-format" id="id75">VFIO cap header format</a></p></li>
+<li><p><a class="reference internal" href="#vfio-sparse-mmap-cap-header" id="id76">VFIO sparse mmap cap header</a></p></li>
+<li><p><a class="reference internal" href="#vfio-region-info-cap-sparse-mmap" id="id77">VFIO region info cap sparse mmap</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-device-get-region-io-fds" id="id78"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_IO_FDS</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id10" id="id79">Request</a></p></li>
+<li><p><a class="reference internal" href="#id11" id="id80">Reply</a></p>
+<ul>
+<li><p><a class="reference internal" href="#sub-region-io-fd-info-format-ioeventfd" id="id81">Sub-Region IO FD info format (ioeventfd)</a></p></li>
+<li><p><a class="reference internal" href="#sub-region-io-fd-info-format-ioregionfd" id="id82">Sub-Region IO FD info format (ioregionfd)</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-device-get-irq-info" id="id83"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_IRQ_INFO</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id12" id="id84">Request</a></p></li>
+<li><p><a class="reference internal" href="#id13" id="id85">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-device-set-irqs" id="id86"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQS</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id14" id="id87">Request</a></p></li>
+<li><p><a class="reference internal" href="#id15" id="id88">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-region-read" id="id89"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_READ</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id16" id="id90">Request</a></p></li>
+<li><p><a class="reference internal" href="#id17" id="id91">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-region-write" id="id92"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id18" id="id93">Request</a></p></li>
+<li><p><a class="reference internal" href="#id19" id="id94">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-dma-read" id="id95"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_READ</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id20" id="id96">Request</a></p></li>
+<li><p><a class="reference internal" href="#id21" id="id97">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-dma-write" id="id98"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_WRITE</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id22" id="id99">Request</a></p></li>
+<li><p><a class="reference internal" href="#id23" id="id100">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-device-reset" id="id101"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_RESET</span></code></a></p></li>
+<li><p><a class="reference internal" href="#vfio-user-region-write-multi" id="id102"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE_MULTI</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id24" id="id103">Request</a></p>
+<ul>
+<li><p><a class="reference internal" href="#single-device-write-format" id="id104">Single Device Write Format</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#id25" id="id105">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-device-feature" id="id106"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_FEATURE</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id26" id="id107">Request</a></p></li>
+<li><p><a class="reference internal" href="#id27" id="id108">Reply</a></p></li>
+<li><p><a class="reference internal" href="#device-features" id="id109">Device Features</a></p>
+<ul>
+<li><p><a class="reference internal" href="#vfio-device-feature-migration" id="id110"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_MIGRATION</span></code></a></p></li>
+<li><p><a class="reference internal" href="#vfio-device-feature-mig-device-state" id="id111"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_MIG_DEVICE_STATE</span></code></a></p></li>
+<li><p><a class="reference internal" href="#direct-state-transitions" id="id112">Direct State Transitions</a></p></li>
+<li><p><a class="reference internal" href="#complex-state-transitions" id="id113">Complex State Transitions</a></p></li>
+<li><p><a class="reference internal" href="#vfio-device-feature-dma-logging-start-vfio-device-feature-dma-logging-stop" id="id114"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_START</span></code> / <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_STOP</span></code></a></p></li>
+<li><p><a class="reference internal" href="#vfio-device-feature-dma-logging-report" id="id115"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_REPORT</span></code></a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-mig-data-read" id="id116"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_READ</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id28" id="id117">Request</a></p></li>
+<li><p><a class="reference internal" href="#id29" id="id118">Reply</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#vfio-user-mig-data-write" id="id119"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_WRITE</span></code></a></p>
+<ul>
+<li><p><a class="reference internal" href="#id30" id="id120">Request</a></p></li>
+<li><p><a class="reference internal" href="#id31" id="id121">Reply</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#appendices" id="id122">Appendices</a></p>
+<ul>
+<li><p><a class="reference internal" href="#unused-vfio-ioctl-commands" id="id123">Unused VFIO <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> commands</a></p>
+<ul>
+<li><p><a class="reference internal" href="#vfio-groups-and-containers" id="id124">VFIO groups and containers</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#backend-program-conventions" id="id125">Backend Program Conventions</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+<section id="introduction">
+<h2><a class="toc-backref" href="#id33" role="doc-backlink">Introduction</a><a class="headerlink" href="#introduction" title="Link to this heading"></a></h2>
+<p>vfio-user is a protocol that allows a device to be emulated in a separate
+process outside of a Virtual Machine Monitor (VMM). vfio-user devices consist
+of a generic VFIO device type, living inside the VMM, which we call the client,
+and the core device implementation, living outside the VMM, which we call the
+server.</p>
+<p>The vfio-user specification is partly based on the
+<a class="reference external" href="https://www.kernel.org/doc/html/latest/driver-api/vfio.html">Linux VFIO ioctl interface</a>.</p>
+<p>VFIO is a mature and stable API, backed by an extensively used framework. The
+existing VFIO client implementation in QEMU (<code class="docutils literal notranslate"><span class="pre">qemu/hw/vfio/</span></code>) can be largely
+re-used, though there is nothing in this specification that requires that
+particular implementation. None of the VFIO kernel modules are required for
+supporting the protocol, on either the client or server side. Some source
+definitions in VFIO are re-used for vfio-user.</p>
+<p>The main idea is to allow a virtual device to function in a separate process in
+the same host over a UNIX domain socket. A UNIX domain socket (<code class="docutils literal notranslate"><span class="pre">AF_UNIX</span></code>) is
+chosen because file descriptors can be trivially sent over it, which in turn
+allows:</p>
+<ul class="simple">
+<li><p>Sharing of client memory for DMA with the server.</p></li>
+<li><p>Sharing of server memory with the client for fast MMIO.</p></li>
+<li><p>Efficient sharing of eventfd’s for triggering interrupts.</p></li>
+</ul>
+<p>Other socket types could be used which allow the server to run in a separate
+guest in the same host (<code class="docutils literal notranslate"><span class="pre">AF_VSOCK</span></code>) or remotely (<code class="docutils literal notranslate"><span class="pre">AF_INET</span></code>). Theoretically
+the underlying transport does not necessarily have to be a socket, however we do
+not examine such alternatives. In this protocol version we focus on using a UNIX
+domain socket and introduce basic support for the other two types of sockets
+without considering performance implications.</p>
+<p>While passing of file descriptors is desirable for performance reasons, support
+is not necessary for either the client or the server in order to implement the
+protocol. There is always an in-band, message-passing fall back mechanism.</p>
+</section>
+<section id="overview">
+<h2><a class="toc-backref" href="#id34" role="doc-backlink">Overview</a><a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>VFIO is a framework that allows a physical device to be securely passed through
+to a user space process; the device-specific kernel driver does not drive the
+device at all.  Typically, the user space process is a VMM and the device is
+passed through to it in order to achieve high performance. VFIO provides an API
+and the required functionality in the kernel. QEMU has adopted VFIO to allow a
+guest to directly access physical devices, instead of emulating them in
+software.</p>
+<p>vfio-user reuses the core VFIO concepts defined in its API, but implements them
+as messages to be sent over a socket. It does not change the kernel-based VFIO
+in any way, in fact none of the VFIO kernel modules need to be loaded to use
+vfio-user. It is also possible for the client to concurrently use the current
+kernel-based VFIO for one device, and vfio-user for another device.</p>
+<section id="vfio-device-model">
+<h3><a class="toc-backref" href="#id35" role="doc-backlink">VFIO Device Model</a><a class="headerlink" href="#vfio-device-model" title="Link to this heading"></a></h3>
+<p>A device under VFIO presents a standard interface to the user process. Many of
+the VFIO operations in the existing interface use the <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> system call, and
+references to the existing interface are called the <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> implementation in
+this document.</p>
+<p>The following sections describe the set of messages that implement the vfio-user
+interface over a socket. In many cases, the messages are analogous to data
+structures used in the <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> implementation. Messages derived from the
+<code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> will have a name derived from the <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> command name.  E.g., the
+<code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_GET_INFO</span></code> <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> command becomes a
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_INFO</span></code> message.  The purpose of this reuse is to share as
+much code as feasible with the <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> implementation.</p>
+<section id="connection-initiation">
+<h4><a class="toc-backref" href="#id36" role="doc-backlink">Connection Initiation</a><a class="headerlink" href="#connection-initiation" title="Link to this heading"></a></h4>
+<p>After the client connects to the server, the initial client message is
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_VERSION</span></code> to propose a protocol version and set of capabilities to
+apply to the session. The server replies with a compatible version and set of
+capabilities it supports, or closes the connection if it cannot support the
+advertised version.</p>
+</section>
+<section id="device-information">
+<h4><a class="toc-backref" href="#id37" role="doc-backlink">Device Information</a><a class="headerlink" href="#device-information" title="Link to this heading"></a></h4>
+<p>The client uses a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_INFO</span></code> message to query the server for
+information about the device. This information includes:</p>
+<ul class="simple">
+<li><p>The device type and whether it supports reset (<code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FLAGS_</span></code>),</p></li>
+<li><p>the number of device regions, and</p></li>
+<li><p>the device presents to the client the number of interrupt types the device
+supports.</p></li>
+</ul>
+</section>
+<section id="region-information">
+<h4><a class="toc-backref" href="#id38" role="doc-backlink">Region Information</a><a class="headerlink" href="#region-information" title="Link to this heading"></a></h4>
+<p>The client uses <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_INFO</span></code> messages to query the
+server for information about the device’s regions. This information describes:</p>
+<ul class="simple">
+<li><p>Read and write permissions, whether it can be memory mapped, and whether it
+supports additional capabilities (<code class="docutils literal notranslate"><span class="pre">VFIO_REGION_INFO_CAP_</span></code>).</p></li>
+<li><p>Region index, size, and offset.</p></li>
+</ul>
+<p>When a device region can be mapped by the client, the server provides a file
+descriptor which the client can <code class="docutils literal notranslate"><span class="pre">mmap()</span></code>. The server is responsible for
+polling for client updates to memory mapped regions.</p>
+<section id="region-capabilities">
+<h5><a class="toc-backref" href="#id39" role="doc-backlink">Region Capabilities</a><a class="headerlink" href="#region-capabilities" title="Link to this heading"></a></h5>
+<p>Some regions have additional capabilities that cannot be described adequately
+by the region info data structure. These capabilities are returned in the
+region info reply in a list similar to PCI capabilities in a PCI device’s
+configuration space.</p>
+</section>
+<section id="sparse-regions">
+<h5><a class="toc-backref" href="#id40" role="doc-backlink">Sparse Regions</a><a class="headerlink" href="#sparse-regions" title="Link to this heading"></a></h5>
+<p>A region can be memory-mappable in whole or in part. When only a subset of a
+region can be mapped by the client, a <code class="docutils literal notranslate"><span class="pre">VFIO_REGION_INFO_CAP_SPARSE_MMAP</span></code>
+capability is included in the region info reply. This capability describes
+which portions can be mapped by the client.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For example, in a virtual NVMe controller, sparse regions can be used so
+that accesses to the NVMe registers (found in the beginning of BAR0) are
+trapped (an infrequent event), while allowing direct access to the doorbells
+(an extremely frequent event as every I/O submission requires a write to
+BAR0), found in the next page after the NVMe registers in BAR0.</p>
+</div>
+</section>
+<section id="device-specific-regions">
+<h5><a class="toc-backref" href="#id41" role="doc-backlink">Device-Specific Regions</a><a class="headerlink" href="#device-specific-regions" title="Link to this heading"></a></h5>
+<p>A device can define regions additional to the standard ones (e.g. PCI indexes
+0-8). This is achieved by including a <code class="docutils literal notranslate"><span class="pre">VFIO_REGION_INFO_CAP_TYPE</span></code> capability
+in the region info reply of a device-specific region. Such regions are reflected
+in <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">vfio_user_device_info.num_regions</span></code>. Thus, for PCI devices this
+value can be equal to, or higher than, <code class="docutils literal notranslate"><span class="pre">VFIO_PCI_NUM_REGIONS</span></code>.</p>
+</section>
+</section>
+</section>
+<section id="region-i-o-via-file-descriptors">
+<h3><a class="toc-backref" href="#id42" role="doc-backlink">Region I/O via file descriptors</a><a class="headerlink" href="#region-i-o-via-file-descriptors" title="Link to this heading"></a></h3>
+<p>For unmapped regions, region I/O from the client is done via
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_READ/WRITE</span></code>.  As an optimization, ioeventfds or ioregionfds
+may be configured for sub-regions of some regions. A client may request
+information on these sub-regions via <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_IO_FDS</span></code>; by
+configuring the returned file descriptors as ioeventfds or ioregionfds, the
+server can be directly notified of I/O (for example, by KVM) without taking a
+trip through the client.</p>
+<section id="interrupts">
+<h4><a class="toc-backref" href="#id43" role="doc-backlink">Interrupts</a><a class="headerlink" href="#interrupts" title="Link to this heading"></a></h4>
+<p>The client uses <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_IRQ_INFO</span></code> messages to query the server
+for the device’s interrupt types. The interrupt types are specific to the bus
+the device is attached to, and the client is expected to know the capabilities
+of each interrupt type. The server can signal an interrupt by directly injecting
+interrupts into the guest via an event file descriptor. The client configures
+how the server signals an interrupt with <code class="docutils literal notranslate"><span class="pre">VFIO_USER_SET_IRQS</span></code> messages.</p>
+</section>
+<section id="device-read-and-write">
+<h4><a class="toc-backref" href="#id44" role="doc-backlink">Device Read and Write</a><a class="headerlink" href="#device-read-and-write" title="Link to this heading"></a></h4>
+<p>When the guest executes load or store operations to an unmapped device region,
+the client forwards these operations to the server with
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_READ</span></code> or <code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE</span></code> messages. The server
+will reply with data from the device on read operations or an acknowledgement on
+write operations. See <a class="reference internal" href="#read-and-write-operations">Read and Write Operations</a>.</p>
+</section>
+</section>
+<section id="client-memory-access">
+<h3><a class="toc-backref" href="#id45" role="doc-backlink">Client memory access</a><a class="headerlink" href="#client-memory-access" title="Link to this heading"></a></h3>
+<p>The client uses <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code> and <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_UNMAP</span></code> messages to
+inform the server of the valid DMA ranges that the server can access on behalf
+of a device (typically, VM guest memory). DMA memory may be accessed by the
+server via <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_READ</span></code> and <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_WRITE</span></code> messages over the
+socket. In this case, the “DMA” part of the naming is a misnomer.</p>
+<p>Actual direct memory access of client memory from the server is possible if the
+client provides file descriptors the server can <code class="docutils literal notranslate"><span class="pre">mmap()</span></code>. Note that <code class="docutils literal notranslate"><span class="pre">mmap()</span></code>
+privileges cannot be revoked by the client, therefore file descriptors should
+only be exported in environments where the client trusts the server not to
+corrupt guest memory.</p>
+<p>See <a class="reference internal" href="#read-and-write-operations">Read and Write Operations</a>.</p>
+</section>
+</section>
+<section id="client-server-interactions">
+<h2><a class="toc-backref" href="#id46" role="doc-backlink">Client/server interactions</a><a class="headerlink" href="#client-server-interactions" title="Link to this heading"></a></h2>
+<section id="socket">
+<h3><a class="toc-backref" href="#id47" role="doc-backlink">Socket</a><a class="headerlink" href="#socket" title="Link to this heading"></a></h3>
+<p>A server can serve:</p>
+<ol class="arabic simple">
+<li><p>one or more clients, and/or</p></li>
+<li><p>one or more virtual devices, belonging to one or more clients.</p></li>
+</ol>
+<p>The current protocol specification requires dedicated sockets per
+client/server connection. Commands in the client-to-server direction are
+handled on the main communication socket which the client connects to, and
+replies to these commands are passed on the same socket. Commands sent in the
+other direction from the server to the client as well as their corresponding
+replies can optionally be passed across a separate socket, which is set up
+during negotiation (AF_UNIX servers just pass the file descriptor).</p>
+<p>Using separate sockets for each command channel avoids introducing an
+artificial point of synchronization between the channels. This simplifies
+implementations since it obviates the need to demultiplex incoming messages
+into commands and replies and interleave command handling and reply processing.
+Note that it is still illegal for implementations to stall command or reply
+processing indefinitely while waiting for replies on the other channel, as this
+may lead to deadlocks. However, since incoming commands and requests arrive on
+different sockets, it’s possible to meet this requirement e.g. by running two
+independent request processing threads that can internally operate
+synchronously. It is expected that this is simpler to implement than fully
+asynchronous message handling code. Implementations may still choose a fully
+asynchronous, event-based design for other reasons, and the protocol fully
+supports it.</p>
+<p>It is a server-side implementation detail whether a single server handles
+multiple virtual devices from the same or multiple clients. The location of the
+socket is implementation-specific. Multiplexing clients, devices, and servers
+over the same socket is not supported in this version of the protocol.</p>
+</section>
+<section id="authentication">
+<h3><a class="toc-backref" href="#id48" role="doc-backlink">Authentication</a><a class="headerlink" href="#authentication" title="Link to this heading"></a></h3>
+<p>For <code class="docutils literal notranslate"><span class="pre">AF_UNIX</span></code>, we rely on OS mandatory access controls on the socket files,
+therefore it is up to the management layer to set up the socket as required.
+Socket types that span guests or hosts will require a proper authentication
+mechanism. Defining that mechanism is deferred to a future version of the
+protocol.</p>
+</section>
+<section id="command-concurrency">
+<h3><a class="toc-backref" href="#id49" role="doc-backlink">Command Concurrency</a><a class="headerlink" href="#command-concurrency" title="Link to this heading"></a></h3>
+<p>A client may pipeline multiple commands without waiting for previous command
+replies.  The server will process commands in the order they are received.  A
+consequence of this is if a client issues a command with the <em>No_reply</em> bit,
+then subsequently issues a command without <em>No_reply</em>, the older command will
+have been processed before the reply to the younger command is sent by the
+server.  The client must be aware of the device’s capability to process
+concurrent commands if pipelining is used.  For example, pipelining allows
+multiple client threads to concurrently access device regions; the client must
+ensure these accesses obey device semantics.</p>
+<p>An example is a frame buffer device, where the device may allow concurrent
+access to different areas of video memory, but may have indeterminate behavior
+if concurrent accesses are performed to command or status registers.</p>
+<p>Note that unrelated messages sent from the server to the client can appear in
+between a client to server request/reply and vice versa.</p>
+<p>Implementers should be prepared for certain commands to exhibit potentially
+unbounded latencies.  For example, <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_RESET</span></code> may take an
+arbitrarily long time to complete; clients should take care not to block
+unnecessarily.</p>
+</section>
+<section id="socket-disconnection-behavior">
+<h3><a class="toc-backref" href="#id50" role="doc-backlink">Socket Disconnection Behavior</a><a class="headerlink" href="#socket-disconnection-behavior" title="Link to this heading"></a></h3>
+<p>The server and the client can disconnect from each other, either intentionally
+or unexpectedly. Both the client and the server need to know how to handle such
+events.</p>
+<section id="server-disconnection">
+<h4><a class="toc-backref" href="#id51" role="doc-backlink">Server Disconnection</a><a class="headerlink" href="#server-disconnection" title="Link to this heading"></a></h4>
+<p>A server disconnecting from the client may indicate that:</p>
+<ol class="arabic simple">
+<li><p>A virtual device has been restarted, either intentionally (e.g. because of a
+device update) or unintentionally (e.g. because of a crash).</p></li>
+<li><p>A virtual device has been shut down with no intention to be restarted.</p></li>
+</ol>
+<p>It is impossible for the client to know whether or not a failure is
+intermittent or innocuous and should be retried, therefore the client should
+reset the VFIO device when it detects the socket has been disconnected.
+Error recovery will be driven by the guest’s device error handling
+behavior.</p>
+</section>
+<section id="client-disconnection">
+<h4><a class="toc-backref" href="#id52" role="doc-backlink">Client Disconnection</a><a class="headerlink" href="#client-disconnection" title="Link to this heading"></a></h4>
+<p>The client disconnecting from the server primarily means that the client
+has exited. Currently, this means that the guest is shut down so the device is
+no longer needed therefore the server can automatically exit. However, there
+can be cases where a client disconnection should not result in a server exit:</p>
+<ol class="arabic simple">
+<li><p>A single server serving multiple clients.</p></li>
+<li><p>A multi-process QEMU upgrading itself step by step, which is not yet
+implemented.</p></li>
+</ol>
+<p>Therefore in order for the protocol to be forward compatible, the server should
+respond to a client disconnection as follows:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>all client memory regions are unmapped and cleaned up (including closing any
+passed file descriptors)</p></li>
+<li><p>all IRQ file descriptors passed from the old client are closed</p></li>
+<li><p>the device state should otherwise be retained</p></li>
+</ul>
+</div></blockquote>
+<p>The expectation is that when a client reconnects, it will re-establish IRQ and
+client memory mappings.</p>
+<p>If anything happens to the client (such as qemu really did exit), the control
+stack will know about it and can clean up resources accordingly.</p>
+</section>
+</section>
+<section id="security-considerations">
+<h3><a class="toc-backref" href="#id53" role="doc-backlink">Security Considerations</a><a class="headerlink" href="#security-considerations" title="Link to this heading"></a></h3>
+<p>Speaking generally, vfio-user clients should not trust servers, and vice versa.
+Standard tools and mechanisms should be used on both sides to validate input and
+prevent against denial of service scenarios, buffer overflow, etc.</p>
+</section>
+<section id="request-retry-and-response-timeout">
+<h3><a class="toc-backref" href="#id54" role="doc-backlink">Request Retry and Response Timeout</a><a class="headerlink" href="#request-retry-and-response-timeout" title="Link to this heading"></a></h3>
+<p>A failed command is a command that has been successfully sent and has been
+responded to with an error code. Failure to send the command in the first place
+(e.g. because the socket is disconnected) is a different type of error examined
+earlier in the disconnect section.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>QEMU’s VFIO retries certain operations if they fail. While this makes sense
+for real HW, we don’t know for sure whether it makes sense for virtual
+devices.</p>
+</div>
+<p>Defining a retry and timeout scheme is deferred to a future version of the
+protocol.</p>
+</section>
+<section id="message-sizes">
+<h3><a class="toc-backref" href="#id55" role="doc-backlink">Message sizes</a><a class="headerlink" href="#message-sizes" title="Link to this heading"></a></h3>
+<p>Some requests have an <code class="docutils literal notranslate"><span class="pre">argsz</span></code> field. In a request, it defines the maximum
+expected reply payload size, which should be at least the size of the fixed
+reply payload headers defined here. The <em>request</em> payload size is defined by the
+usual <code class="docutils literal notranslate"><span class="pre">msg_size</span></code> field in the header, not the <code class="docutils literal notranslate"><span class="pre">argsz</span></code> field.</p>
+<p>In a reply, the server sets <code class="docutils literal notranslate"><span class="pre">argsz</span></code> field to the size needed for a full
+payload size. This may be less than the requested maximum size. This may be
+larger than the requested maximum size: in that case, the full payload is not
+included in the reply, but the <code class="docutils literal notranslate"><span class="pre">argsz</span></code> field in the reply indicates the needed
+size, allowing a client to allocate a larger buffer for holding the reply before
+trying again.</p>
+<p>In addition, during negotiation (see  <a class="reference internal" href="#version">Version</a>), the client and server may
+each specify a <code class="docutils literal notranslate"><span class="pre">max_data_xfer_size</span></code> value; this defines the maximum data that
+may be read or written via one of the <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA/REGION_READ/WRITE</span></code>
+messages; see <a class="reference internal" href="#read-and-write-operations">Read and Write Operations</a>.</p>
+</section>
+</section>
+<section id="protocol-specification">
+<h2><a class="toc-backref" href="#id56" role="doc-backlink">Protocol Specification</a><a class="headerlink" href="#protocol-specification" title="Link to this heading"></a></h2>
+<p>To distinguish from the base VFIO symbols, all vfio-user symbols are prefixed
+with <code class="docutils literal notranslate"><span class="pre">vfio_user</span></code> or <code class="docutils literal notranslate"><span class="pre">VFIO_USER</span></code>. In this revision, all data is in the
+endianness of the host system, although this may be relaxed in future
+revisions in cases where the client and server run on different hosts
+with different endianness.</p>
+<p>Unless otherwise specified, all sizes should be presumed to be in bytes.</p>
+<section id="commands">
+<span id="id1"></span><h3><a class="toc-backref" href="#id57" role="doc-backlink">Commands</a><a class="headerlink" href="#commands" title="Link to this heading"></a></h3>
+<p>The following table lists the VFIO message command IDs, and whether the
+message command is sent from the client or the server.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Command</p></th>
+<th class="head"><p>Request Direction</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_VERSION</span></code></p></td>
+<td><p>1</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code></p></td>
+<td><p>2</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_UNMAP</span></code></p></td>
+<td><p>3</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_INFO</span></code></p></td>
+<td><p>4</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_INFO</span></code></p></td>
+<td><p>5</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_IO_FDS</span></code></p></td>
+<td><p>6</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_IRQ_INFO</span></code></p></td>
+<td><p>7</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQS</span></code></p></td>
+<td><p>8</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_READ</span></code></p></td>
+<td><p>9</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE</span></code></p></td>
+<td><p>10</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_READ</span></code></p></td>
+<td><p>11</p></td>
+<td><p>server -&gt; client</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_WRITE</span></code></p></td>
+<td><p>12</p></td>
+<td><p>server -&gt; client</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_RESET</span></code></p></td>
+<td><p>13</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE_MULTI</span></code></p></td>
+<td><p>15</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_FEATURE</span></code></p></td>
+<td><p>16</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_READ</span></code></p></td>
+<td><p>17</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_WRITE</span></code></p></td>
+<td><p>18</p></td>
+<td><p>client -&gt; server</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="header">
+<h3><a class="toc-backref" href="#id58" role="doc-backlink">Header</a><a class="headerlink" href="#header" title="Link to this heading"></a></h3>
+<p>All messages, both command messages and reply messages, are preceded by a
+16-byte header that contains basic information about the message. The header is
+followed by message-specific data described in the sections below.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Message ID</p></td>
+<td><p>0</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-odd"><td><p>Command</p></td>
+<td><p>2</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-even"><td><p>Message size</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>Flags</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0-3</p></td>
+<td><p>Type</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>No_reply</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Error</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Error</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>&lt;message data&gt;</p></td>
+<td><p>16</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>Message ID</em> identifies the message, and is echoed in the command’s reply
+message. Message IDs belong entirely to the sender, can be re-used (even
+concurrently) and the receiver must not make any assumptions about their
+uniqueness.</p></li>
+<li><p><em>Command</em> specifies the command to be executed, listed in <a class="reference internal" href="#commands">Commands</a>. It is
+also set in the reply header.</p></li>
+<li><p><em>Message size</em> contains the size of the entire message, including the header.</p></li>
+<li><p><em>Flags</em> contains attributes of the message:</p>
+<ul>
+<li><p>The <em>Type</em> bits indicate the message type.</p>
+<ul>
+<li><p><em>Command</em> (value 0x0) indicates a command message.</p></li>
+<li><p><em>Reply</em> (value 0x1) indicates a reply message acknowledging a previous
+command with the same message ID.</p></li>
+</ul>
+</li>
+<li><p><em>No_reply</em> in a command message indicates that no reply is needed for this
+command.  This is commonly used when multiple commands are sent, and only
+the last needs acknowledgement.</p></li>
+<li><p><em>Error</em> in a reply message indicates the command being acknowledged had
+an error. In this case, the <em>Error</em> field will be valid.</p></li>
+</ul>
+</li>
+<li><p><em>Error</em> in a reply message is an optional UNIX errno value. It may be zero
+even if the Error bit is set in Flags. It is reserved in a command message.</p></li>
+</ul>
+<p>Each command message in <a class="reference internal" href="#commands">Commands</a> must be replied to with a reply message,
+unless the message sets the <em>No_Reply</em> bit.  The reply consists of the header
+with the <em>Reply</em> bit set, plus any additional data.</p>
+<p>If an error occurs, the reply message must only include the reply header.</p>
+<p>As the header is standard in both requests and replies, it is not included in
+the command-specific specifications below; each message definition should be
+appended to the standard header, and the offsets are given from the end of the
+standard header.</p>
+</section>
+<section id="vfio-user-version">
+<h3><a class="toc-backref" href="#id59" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_VERSION</span></code></a><a class="headerlink" href="#vfio-user-version" title="Link to this heading"></a></h3>
+<p id="version">This is the initial message sent by the client after the socket connection is
+established; the same format is used for the server’s reply.</p>
+<p>Upon establishing a connection, the client must send a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_VERSION</span></code>
+message proposing a protocol version and a set of capabilities. The server
+compares these with the versions and capabilities it supports and sends a
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_VERSION</span></code> reply according to the following rules.</p>
+<ul class="simple">
+<li><p>The major version in the reply must be the same as proposed. If the client
+does not support the proposed major, it closes the connection.</p></li>
+<li><p>The minor version in the reply must be equal to or less than the minor
+version proposed.</p></li>
+<li><p>The capability list must be a subset of those proposed. If the server
+requires a capability the client did not include, it closes the connection.</p></li>
+</ul>
+<p>The protocol major version will only change when incompatible protocol changes
+are made, such as changing the message format. The minor version may change
+when compatible changes are made, such as adding new messages or capabilities,
+Both the client and server must support all minor versions less than the
+maximum minor version it supports. E.g., an implementation that supports
+version 1.3 must also support 1.0 through 1.2.</p>
+<p>When making a change to this specification, the protocol version number must
+be included in the form “added in version X.Y”</p>
+<section id="request">
+<h4><a class="toc-backref" href="#id60" role="doc-backlink">Request</a><a class="headerlink" href="#request" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>version major</p></td>
+<td><p>0</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-odd"><td><p>version minor</p></td>
+<td><p>2</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-even"><td><p>version data</p></td>
+<td><p>4</p></td>
+<td><p>variable (including terminating NUL). Optional.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The version data is an optional UTF-8 encoded JSON byte array with the following
+format:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>capabilities</p></td>
+<td><p>object</p></td>
+<td><p>Contains common capabilities that
+the sender supports. Optional.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Capabilities:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>max_msg_fds</p></td>
+<td><p>number</p></td>
+<td><p>Maximum number of file descriptors that can
+be received by the sender in one message.
+Optional. If not specified then the receiver
+must assume a value of <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>max_data_xfer_size</p></td>
+<td><p>number</p></td>
+<td><p>Maximum <code class="docutils literal notranslate"><span class="pre">count</span></code> for data transfer messages;
+see <a class="reference internal" href="#read-and-write-operations">Read and Write Operations</a>. Optional,
+with a default value of 1048576 bytes.</p></td>
+</tr>
+<tr class="row-even"><td><p>max_dma_maps</p></td>
+<td><p>number</p></td>
+<td><p>Maximum number DMA map windows that can be
+valid simultaneously.  Optional, with a
+value of 65535 (64k-1).</p></td>
+</tr>
+<tr class="row-odd"><td><p>pgsizes</p></td>
+<td><p>number</p></td>
+<td><p>Page sizes supported in DMA map operations
+or’ed together. Optional, with a default
+value of supporting only 4k pages.</p></td>
+</tr>
+<tr class="row-even"><td><p>twin_socket</p></td>
+<td><p>object</p></td>
+<td><p>Parameters for twin-socket mode, which
+handles server-to-client commands and their
+replies on a separate socket. Optional.</p></td>
+</tr>
+<tr class="row-odd"><td><p>write_multiple</p></td>
+<td><p>boolean</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE_MULTI</span></code> messages
+are supported if the value is <code class="docutils literal notranslate"><span class="pre">true</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The <code class="docutils literal notranslate"><span class="pre">twin_socket</span></code> capability object holds these name/value pairs:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>supported</p></td>
+<td><p>boolean</p></td>
+<td><p>Indicates whether the sender supports twin-socket
+mode. Optional, defaults to false.</p></td>
+</tr>
+<tr class="row-odd"><td><p>fd_index</p></td>
+<td><p>number</p></td>
+<td><p>Specifies an index in the file descriptor array
+included with the message. The designated file
+descriptor is a socket which is to be used for the
+server-to-client command channel. Optional, only valid
+in the reply message.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="reply">
+<h4><a class="toc-backref" href="#id61" role="doc-backlink">Reply</a><a class="headerlink" href="#reply" title="Link to this heading"></a></h4>
+<p>The same message format is used in the server’s reply with the semantics
+described above.</p>
+<p>If and only if the client has indicated support for twin-socket mode by setting
+<code class="docutils literal notranslate"><span class="pre">twin_socket.supported</span></code> to true in its capabilities, the server may optionally
+set up a separate command channel for server-to-client commands and their
+replies. The server enables twin-socket mode as follows:</p>
+<ul class="simple">
+<li><p>Create a fresh socket pair.</p></li>
+<li><p>Keep the server end of the socket pair and pass the client end in the file
+descriptor array included with the reply message.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">twin_socket.supported</span></code> to true in the reply.</p></li>
+<li><p>Indicate the index in the file descriptor array by the
+<code class="docutils literal notranslate"><span class="pre">twin_socket.fd_index</span></code> capability field in the reply, so the client can
+identify the correct file descriptor to use.</p></li>
+</ul>
+<p>A client requesting twin-socket mode must examine the <code class="docutils literal notranslate"><span class="pre">twin_socket</span></code> capability
+in the reply:</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">twin_socket.supported</span></code> is false, the field is missing, or the entire
+<code class="docutils literal notranslate"><span class="pre">twin_socket</span></code> object is absent, the server does not support twin-socket mode
+or decided not to enable it. The client can choose whether it wants to proceed
+without twin-socket mode, or close the connection if not.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">twin_socket.supported</span></code> is true and <code class="docutils literal notranslate"><span class="pre">twin_socket.fd_index</span></code> is present
+and refers to a valid file descriptor, twin-socket mode negotiation has
+succeeded. The client monitors the provided file descriptor for commands from
+the server.</p></li>
+<li><p>Otherwise, the reply from the server is inconsistent. The client must abort
+and close the connection since it is potentially unable to receive commands
+from the server.</p></li>
+</ul>
+<p>The twin-socket feature is optional, so some servers may not support it.
+However, for server implementations that do send server-to-client commands it is
+strongly recommended to implement twin-socket support.</p>
+</section>
+</section>
+<section id="vfio-user-dma-map">
+<h3><a class="toc-backref" href="#id62" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code></a><a class="headerlink" href="#vfio-user-dma-map" title="Link to this heading"></a></h3>
+<p>This command message is sent by the client to the server to inform it of the
+memory regions the server can access. It must be sent before the server can
+perform any DMA to the client. It is normally sent directly after the version
+handshake is completed, but may also occur when memory is added to the client,
+or if the client uses a vIOMMU.</p>
+<section id="id2">
+<h4><a class="toc-backref" href="#id63" role="doc-backlink">Request</a><a class="headerlink" href="#id2" title="Link to this heading"></a></h4>
+<p>The request payload for this message is a structure of the following format:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>readable</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>writeable</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>offset</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-even"><td><p>address</p></td>
+<td><p>16</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>24</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the size of the above structure. Note there is no reply payload,
+so this field differs from other message types.</p></li>
+<li><p><em>flags</em> contains the following region attributes:</p>
+<ul>
+<li><p><em>readable</em> indicates that the region can be read from.</p></li>
+<li><p><em>writeable</em> indicates that the region can be written to.</p></li>
+</ul>
+</li>
+<li><p><em>offset</em> is the file offset of the region with respect to the associated file
+descriptor, or zero if the region is not mappable</p></li>
+<li><p><em>address</em> is the base DMA address of the region.</p></li>
+<li><p><em>size</em> is the size of the region.</p></li>
+</ul>
+<p>This structure is 32 bytes in size, so the message size is 16 + 32 bytes.</p>
+<p>If the DMA region being added can be directly mapped by the server, a file
+descriptor must be sent as part of the message meta-data. The region can be
+mapped via the mmap() system call. On <code class="docutils literal notranslate"><span class="pre">AF_UNIX</span></code> sockets, the file descriptor
+must be passed as <code class="docutils literal notranslate"><span class="pre">SCM_RIGHTS</span></code> type ancillary data.  Otherwise, if the DMA
+region cannot be directly mapped by the server, no file descriptor must be sent
+as part of the message meta-data and the DMA region can be accessed by the
+server using <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_READ</span></code> and <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_WRITE</span></code> messages,
+explained in <a class="reference internal" href="#read-and-write-operations">Read and Write Operations</a>. A command to map over an existing
+region must be failed by the server with <code class="docutils literal notranslate"><span class="pre">EEXIST</span></code> set in error field in the
+reply.</p>
+</section>
+<section id="id3">
+<h4><a class="toc-backref" href="#id64" role="doc-backlink">Reply</a><a class="headerlink" href="#id3" title="Link to this heading"></a></h4>
+<p>There is no payload in the reply message.</p>
+</section>
+</section>
+<section id="vfio-user-dma-unmap">
+<h3><a class="toc-backref" href="#id65" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_UNMAP</span></code></a><a class="headerlink" href="#vfio-user-dma-unmap" title="Link to this heading"></a></h3>
+<p>This command message is sent by the client to the server to inform it that a
+DMA region, previously made available via a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code> command
+message, is no longer available for DMA. It typically occurs when memory is
+subtracted from the client or if the client uses a vIOMMU. The DMA region is
+described by the following structure:</p>
+<section id="id4">
+<h4><a class="toc-backref" href="#id66" role="doc-backlink">Request</a><a class="headerlink" href="#id4" title="Link to this heading"></a></h4>
+<p>The request payload for this message is a structure of the following format:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>address</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>16</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the maximum size of the reply payload.</p></li>
+<li><p><em>flags</em> is unused in this version.</p></li>
+<li><p><em>address</em> is the base DMA address of the DMA region.</p></li>
+<li><p><em>size</em> is the size of the DMA region.</p></li>
+</ul>
+<p>The address and size of the DMA region being unmapped must match exactly a
+previous mapping.</p>
+</section>
+<section id="id5">
+<h4><a class="toc-backref" href="#id67" role="doc-backlink">Reply</a><a class="headerlink" href="#id5" title="Link to this heading"></a></h4>
+<p>Upon receiving a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_UNMAP</span></code> command, if the file descriptor is
+mapped then the server must release all references to that DMA region before
+replying, which potentially includes in-flight DMA transactions.</p>
+<p>The server responds with the original DMA entry in the request.</p>
+</section>
+</section>
+<section id="vfio-user-device-get-info">
+<h3><a class="toc-backref" href="#id68" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_INFO</span></code></a><a class="headerlink" href="#vfio-user-device-get-info" title="Link to this heading"></a></h3>
+<p>This command message is sent by the client to the server to query for basic
+information about the device.</p>
+<section id="id6">
+<h4><a class="toc-backref" href="#id69" role="doc-backlink">Request</a><a class="headerlink" href="#id6" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>VFIO_DEVICE_FLAGS_RESET</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>VFIO_DEVICE_FLAGS_PCI</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>num_regions</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>num_irqs</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the maximum size of the reply payload</p></li>
+<li><p>all other fields must be zero.</p></li>
+</ul>
+</section>
+<section id="id7">
+<h4><a class="toc-backref" href="#id70" role="doc-backlink">Reply</a><a class="headerlink" href="#id7" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>VFIO_DEVICE_FLAGS_RESET</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>VFIO_DEVICE_FLAGS_PCI</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>num_regions</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>num_irqs</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the size required for the full reply payload (16 bytes today)</p></li>
+<li><p><em>flags</em> contains the following device attributes.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FLAGS_RESET</span></code> indicates that the device supports the
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_RESET</span></code> message.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FLAGS_PCI</span></code> indicates that the device is a PCI device.</p></li>
+</ul>
+</li>
+<li><p><em>num_regions</em> is the number of memory regions that the device exposes.</p></li>
+<li><p><em>num_irqs</em> is the number of distinct interrupt types that the device supports.</p></li>
+</ul>
+<p>This version of the protocol only supports PCI devices. Additional devices may
+be supported in future versions.</p>
+</section>
+</section>
+<section id="vfio-user-device-get-region-info">
+<h3><a class="toc-backref" href="#id71" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_INFO</span></code></a><a class="headerlink" href="#vfio-user-device-get-region-info" title="Link to this heading"></a></h3>
+<p>This command message is sent by the client to the server to query for
+information about device regions. The VFIO region info structure is defined in
+<code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">vfio_region_info</span></code>).</p>
+<section id="id8">
+<h4><a class="toc-backref" href="#id72" role="doc-backlink">Request</a><a class="headerlink" href="#id8" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>index</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>cap_offset</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>size</p></td>
+<td><p>16</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>offset</p></td>
+<td><p>24</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> the maximum size of the reply payload</p></li>
+<li><p><em>index</em> is the index of memory region being queried, it is the only field
+that is required to be set in the command message.</p></li>
+<li><p>all other fields must be zero.</p></li>
+</ul>
+</section>
+<section id="id9">
+<h4><a class="toc-backref" href="#id73" role="doc-backlink">Reply</a><a class="headerlink" href="#id9" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>VFIO_REGION_INFO_FLAG_READ</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>VFIO_REGION_INFO_FLAG_WRITE</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>VFIO_REGION_INFO_FLAG_MMAP</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>VFIO_REGION_INFO_FLAG_CAPS</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>index</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>cap_offset</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>size</p></td>
+<td><p>16</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>offset</p></td>
+<td><p>24</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the size required for the full reply payload (region info structure
+plus the size of any region capabilities)</p></li>
+<li><p><em>flags</em> are attributes of the region:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_REGION_INFO_FLAG_READ</span></code> allows client read access to the region.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_REGION_INFO_FLAG_WRITE</span></code> allows client write access to the region.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_REGION_INFO_FLAG_MMAP</span></code> specifies the client can mmap() the region.
+When this flag is set, the reply will include a file descriptor in its
+meta-data. On <code class="docutils literal notranslate"><span class="pre">AF_UNIX</span></code> sockets, the file descriptors will be passed as
+<code class="docutils literal notranslate"><span class="pre">SCM_RIGHTS</span></code> type ancillary data.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_REGION_INFO_FLAG_CAPS</span></code> indicates additional capabilities found in the
+reply.</p></li>
+</ul>
+</li>
+<li><p><em>index</em> is the index of memory region being queried, it is the only field
+that is required to be set in the command message.</p></li>
+<li><p><em>cap_offset</em> describes where additional region capabilities can be found.
+cap_offset is relative to the beginning of the VFIO region info structure.
+The data structure it points is a VFIO cap header defined in
+<code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code>.</p></li>
+<li><p><em>size</em> is the size of the region.</p></li>
+<li><p><em>offset</em> is the offset that should be given to the mmap() system call for
+regions with the MMAP attribute. It is also used as the base offset when
+mapping a VFIO sparse mmap area, described below.</p></li>
+</ul>
+<section id="vfio-region-capabilities">
+<h5><a class="toc-backref" href="#id74" role="doc-backlink">VFIO region capabilities</a><a class="headerlink" href="#vfio-region-capabilities" title="Link to this heading"></a></h5>
+<p>The VFIO region information can also include a capabilities list. This list is
+similar to a PCI capability list - each entry has a common header that
+identifies a capability and where the next capability in the list can be found.
+The VFIO capability header format is defined in <code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">struct</span>
+<span class="pre">vfio_info_cap_header</span></code>).</p>
+</section>
+<section id="vfio-cap-header-format">
+<h5><a class="toc-backref" href="#id75" role="doc-backlink">VFIO cap header format</a><a class="headerlink" href="#vfio-cap-header-format" title="Link to this heading"></a></h5>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>id</p></td>
+<td><p>0</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-odd"><td><p>version</p></td>
+<td><p>2</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-even"><td><p>next</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>id</em> is the capability identity.</p></li>
+<li><p><em>version</em> is a capability-specific version number.</p></li>
+<li><p><em>next</em> specifies the offset of the next capability in the capability list. It
+is relative to the beginning of the VFIO region info structure.</p></li>
+</ul>
+</section>
+<section id="vfio-sparse-mmap-cap-header">
+<h5><a class="toc-backref" href="#id76" role="doc-backlink">VFIO sparse mmap cap header</a><a class="headerlink" href="#vfio-sparse-mmap-cap-header" title="Link to this heading"></a></h5>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>id</p></td>
+<td><p>VFIO_REGION_INFO_CAP_SPARSE_MMAP</p></td>
+</tr>
+<tr class="row-odd"><td><p>version</p></td>
+<td><p>0x1</p></td>
+</tr>
+<tr class="row-even"><td><p>next</p></td>
+<td><p>&lt;next&gt;</p></td>
+</tr>
+<tr class="row-odd"><td><p>sparse mmap info</p></td>
+<td><p>VFIO region info sparse mmap</p></td>
+</tr>
+</tbody>
+</table>
+<p>This capability is defined when only a subrange of the region supports
+direct access by the client via mmap(). The VFIO sparse mmap area is defined in
+<code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">vfio_region_sparse_mmap_area</span></code> and <code class="docutils literal notranslate"><span class="pre">struct</span>
+<span class="pre">vfio_region_info_cap_sparse_mmap</span></code>).</p>
+</section>
+<section id="vfio-region-info-cap-sparse-mmap">
+<h5><a class="toc-backref" href="#id77" role="doc-backlink">VFIO region info cap sparse mmap</a><a class="headerlink" href="#vfio-region-info-cap-sparse-mmap" title="Link to this heading"></a></h5>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>nr_areas</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>reserved</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>16</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-even"><td><p>…</p></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>nr_areas</em> is the number of sparse mmap areas in the region.</p></li>
+<li><p><em>offset</em> and size describe a single area that can be mapped by the client.
+There will be <em>nr_areas</em> pairs of offset and size. The offset will be added to
+the base offset given in the <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_INFO</span></code> to form the
+offset argument of the subsequent mmap() call.</p></li>
+</ul>
+<p>The VFIO sparse mmap area is defined in <code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">struct</span>
+<span class="pre">vfio_region_info_cap_sparse_mmap</span></code>).</p>
+</section>
+</section>
+</section>
+<section id="vfio-user-device-get-region-io-fds">
+<h3><a class="toc-backref" href="#id78" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_IO_FDS</span></code></a><a class="headerlink" href="#vfio-user-device-get-region-io-fds" title="Link to this heading"></a></h3>
+<p>Clients can access regions via <code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_READ/WRITE</span></code> or, if provided, by
+<code class="docutils literal notranslate"><span class="pre">mmap()</span></code> of a file descriptor provided by the server.</p>
+<p><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_REGION_IO_FDS</span></code> provides an alternative access mechanism via
+file descriptors. This is an optional feature intended for performance
+improvements where an underlying sub-system (such as KVM) supports communication
+across such file descriptors to the vfio-user server, without needing to
+round-trip through the client.</p>
+<p>The server returns an array of sub-regions for the requested region. Each
+sub-region describes a span (offset and size) of a region, along with the
+requested file descriptor notification mechanism to use.  Each sub-region in the
+response message may choose to use a different method, as defined below.  The
+two mechanisms supported in this specification are ioeventfds and ioregionfds.</p>
+<p>The server in addition returns a file descriptor in the ancillary data; clients
+are expected to configure each sub-region’s file descriptor with the requested
+notification method. For example, a client could configure KVM with the
+requested ioeventfd via a <code class="docutils literal notranslate"><span class="pre">KVM_IOEVENTFD</span></code> <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code>.</p>
+<section id="id10">
+<h4><a class="toc-backref" href="#id79" role="doc-backlink">Request</a><a class="headerlink" href="#id10" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>index</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> the maximum size of the reply payload</p></li>
+<li><p><em>index</em> is the index of memory region being queried</p></li>
+<li><p>all other fields must be zero</p></li>
+</ul>
+<p>The client must set <code class="docutils literal notranslate"><span class="pre">flags</span></code> to zero and specify the region being queried in
+the <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+</section>
+<section id="id11">
+<h4><a class="toc-backref" href="#id80" role="doc-backlink">Reply</a><a class="headerlink" href="#id11" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>index</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>sub-regions</p></td>
+<td><p>16</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the size of the region IO FD info structure plus the
+total size of the sub-region array. Thus, each array entry “i” is at offset
+i * ((argsz - 32) / count). Note that currently this is 40 bytes for both IO
+FD types, but this is not to be relied on. As elsewhere, this indicates the
+full reply payload size needed.</p></li>
+<li><p><em>flags</em> must be zero</p></li>
+<li><p><em>index</em> is the index of memory region being queried</p></li>
+<li><p><em>count</em> is the number of sub-regions in the array</p></li>
+<li><p><em>sub-regions</em> is the array of Sub-Region IO FD info structures</p></li>
+</ul>
+<p>The reply message will additionally include at least one file descriptor in the
+ancillary data. Note that more than one sub-region may share the same file
+descriptor.</p>
+<p>Note that it is the client’s responsibility to verify the requested values (for
+example, that the requested offset does not exceed the region’s bounds).</p>
+<p>Each sub-region given in the response has one of two possible structures,
+depending whether <em>type</em> is <code class="docutils literal notranslate"><span class="pre">VFIO_USER_IO_FD_TYPE_IOEVENTFD</span></code> or
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_IO_FD_TYPE_IOREGIONFD</span></code>:</p>
+<section id="sub-region-io-fd-info-format-ioeventfd">
+<h5><a class="toc-backref" href="#id81" role="doc-backlink">Sub-Region IO FD info format (ioeventfd)</a><a class="headerlink" href="#sub-region-io-fd-info-format-ioeventfd" title="Link to this heading"></a></h5>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-even"><td><p>fd_index</p></td>
+<td><p>16</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>type</p></td>
+<td><p>20</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>flags</p></td>
+<td><p>24</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>padding</p></td>
+<td><p>28</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>datamatch</p></td>
+<td><p>32</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>offset</em> is the offset of the start of the sub-region within the region
+requested (“physical address offset” for the region)</p></li>
+<li><p><em>size</em> is the length of the sub-region. This may be zero if the access size is
+not relevant, which may allow for optimizations</p></li>
+<li><p><em>fd_index</em> is the index in the ancillary data of the FD to use for ioeventfd
+notification; it may be shared.</p></li>
+<li><p><em>type</em> is <code class="docutils literal notranslate"><span class="pre">VFIO_USER_IO_FD_TYPE_IOEVENTFD</span></code></p></li>
+<li><p><em>flags</em> is any of:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">KVM_IOEVENTFD_FLAG_DATAMATCH</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">KVM_IOEVENTFD_FLAG_PIO</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">KVM_IOEVENTFD_FLAG_VIRTIO_CCW_NOTIFY</span></code> (FIXME: makes sense?)</p></li>
+</ul>
+</li>
+<li><p><em>datamatch</em> is the datamatch value if needed</p></li>
+</ul>
+<p>See <a class="reference external" href="https://www.kernel.org/doc/Documentation/virtual/kvm/api.txt">https://www.kernel.org/doc/Documentation/virtual/kvm/api.txt</a>, <em>4.59
+KVM_IOEVENTFD</em> for further context on the ioeventfd-specific fields.</p>
+</section>
+<section id="sub-region-io-fd-info-format-ioregionfd">
+<h5><a class="toc-backref" href="#id82" role="doc-backlink">Sub-Region IO FD info format (ioregionfd)</a><a class="headerlink" href="#sub-region-io-fd-info-format-ioregionfd" title="Link to this heading"></a></h5>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-even"><td><p>fd_index</p></td>
+<td><p>16</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>type</p></td>
+<td><p>20</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>flags</p></td>
+<td><p>24</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>padding</p></td>
+<td><p>28</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>user_data</p></td>
+<td><p>32</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>offset</em> is the offset of the start of the sub-region within the region
+requested (“physical address offset” for the region)</p></li>
+<li><p><em>size</em> is the length of the sub-region. This may be zero if the access size is
+not relevant, which may allow for optimizations; <code class="docutils literal notranslate"><span class="pre">KVM_IOREGION_POSTED_WRITES</span></code>
+must be set in <em>flags</em> in this case</p></li>
+<li><p><em>fd_index</em> is the index in the ancillary data of the FD to use for ioregionfd
+messages; it may be shared</p></li>
+<li><p><em>type</em> is <code class="docutils literal notranslate"><span class="pre">VFIO_USER_IO_FD_TYPE_IOREGIONFD</span></code></p></li>
+<li><p><em>flags</em> is any of:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">KVM_IOREGION_PIO</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">KVM_IOREGION_POSTED_WRITES</span></code></p></li>
+</ul>
+</li>
+<li><p><em>user_data</em> is an opaque value passed back to the server via a message on the
+file descriptor</p></li>
+</ul>
+<p>For further information on the ioregionfd-specific fields, see:
+<a class="reference external" href="https://lore.kernel.org/kvm/cover.1613828726.git.eafanasova&#64;gmail.com/">https://lore.kernel.org/kvm/cover.1613828726.git.eafanasova&#64;gmail.com/</a></p>
+<p>(FIXME: update with final API docs.)</p>
+</section>
+</section>
+</section>
+<section id="vfio-user-device-get-irq-info">
+<h3><a class="toc-backref" href="#id83" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_GET_IRQ_INFO</span></code></a><a class="headerlink" href="#vfio-user-device-get-irq-info" title="Link to this heading"></a></h3>
+<p>This command message is sent by the client to the server to query for
+information about device interrupt types. The VFIO IRQ info structure is
+defined in <code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">vfio_irq_info</span></code>).</p>
+<section id="id12">
+<h4><a class="toc-backref" href="#id84" role="doc-backlink">Request</a><a class="headerlink" href="#id12" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>VFIO_IRQ_INFO_EVENTFD</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>VFIO_IRQ_INFO_MASKABLE</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>VFIO_IRQ_INFO_AUTOMASKED</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>VFIO_IRQ_INFO_NORESIZE</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>index</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the maximum size of the reply payload (16 bytes today)</p></li>
+<li><p>index is the index of IRQ type being queried (e.g. <code class="docutils literal notranslate"><span class="pre">VFIO_PCI_MSIX_IRQ_INDEX</span></code>)</p></li>
+<li><p>all other fields must be zero</p></li>
+</ul>
+</section>
+<section id="id13">
+<h4><a class="toc-backref" href="#id85" role="doc-backlink">Reply</a><a class="headerlink" href="#id13" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>VFIO_IRQ_INFO_EVENTFD</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>VFIO_IRQ_INFO_MASKABLE</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>VFIO_IRQ_INFO_AUTOMASKED</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>VFIO_IRQ_INFO_NORESIZE</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>index</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the size required for the full reply payload (16 bytes today)</p></li>
+<li><p><em>flags</em> defines IRQ attributes:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_INFO_EVENTFD</span></code> indicates the IRQ type can support server eventfd
+signalling.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_INFO_MASKABLE</span></code> indicates that the IRQ type supports the <code class="docutils literal notranslate"><span class="pre">MASK</span></code>
+and <code class="docutils literal notranslate"><span class="pre">UNMASK</span></code> actions in a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQS</span></code> message.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_INFO_AUTOMASKED</span></code> indicates the IRQ type masks itself after being
+triggered, and the client must send an <code class="docutils literal notranslate"><span class="pre">UNMASK</span></code> action to receive new
+interrupts.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_INFO_NORESIZE</span></code> indicates <code class="docutils literal notranslate"><span class="pre">VFIO_USER_SET_IRQS</span></code> operations setup
+interrupts as a set, and new sub-indexes cannot be enabled without disabling
+the entire type.</p></li>
+</ul>
+</li>
+<li><p>index is the index of IRQ type being queried</p></li>
+<li><p>count describes the number of interrupts of the queried type.</p></li>
+</ul>
+</section>
+</section>
+<section id="vfio-user-device-set-irqs">
+<h3><a class="toc-backref" href="#id86" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQS</span></code></a><a class="headerlink" href="#vfio-user-device-set-irqs" title="Link to this heading"></a></h3>
+<p>This command message is sent by the client to the server to set actions for
+device interrupt types. The VFIO IRQ set structure is defined in
+<code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code> (<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">vfio_irq_set</span></code>).</p>
+<section id="id14">
+<h4><a class="toc-backref" href="#id87" role="doc-backlink">Request</a><a class="headerlink" href="#id14" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>VFIO_IRQ_SET_DATA_NONE</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>VFIO_IRQ_SET_DATA_BOOL</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>VFIO_IRQ_SET_DATA_EVENTFD</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>VFIO_IRQ_SET_ACTION_MASK</p></td>
+</tr>
+<tr class="row-even"><td><p>4</p></td>
+<td><p>VFIO_IRQ_SET_ACTION_UNMASK</p></td>
+</tr>
+<tr class="row-odd"><td><p>5</p></td>
+<td><p>VFIO_IRQ_SET_ACTION_TRIGGER</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>index</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>start</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>count</p></td>
+<td><p>16</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>data</p></td>
+<td><p>20</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the size of the VFIO IRQ set request payload, including any <em>data</em>
+field. Note there is no reply payload, so this field differs from other
+message types.</p></li>
+<li><p><em>flags</em> defines the action performed on the interrupt range. The <code class="docutils literal notranslate"><span class="pre">DATA</span></code>
+flags describe the data field sent in the message; the <code class="docutils literal notranslate"><span class="pre">ACTION</span></code> flags
+describe the action to be performed. The flags are mutually exclusive for
+both sets.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_NONE</span></code> indicates there is no data field in the command.
+The action is performed unconditionally.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_BOOL</span></code> indicates the data field is an array of boolean
+bytes. The action is performed if the corresponding boolean is true.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_EVENTFD</span></code> indicates an array of event file descriptors
+was sent in the message meta-data. These descriptors will be signalled when
+the action defined by the action flags occurs. In <code class="docutils literal notranslate"><span class="pre">AF_UNIX</span></code> sockets, the
+descriptors are sent as <code class="docutils literal notranslate"><span class="pre">SCM_RIGHTS</span></code> type ancillary data.
+If no file descriptors are provided, this de-assigns the specified
+previously configured interrupts.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_ACTION_MASK</span></code> indicates a masking event. It can be used with
+<code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_BOOL</span></code> or <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_NONE</span></code> to mask an interrupt,
+or with <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_EVENTFD</span></code> to generate an event when the guest masks
+the interrupt.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_ACTION_UNMASK</span></code> indicates an unmasking event. It can be used
+with <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_BOOL</span></code> or <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_NONE</span></code> to unmask an
+interrupt, or with <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_EVENTFD</span></code> to generate an event when the
+guest unmasks the interrupt.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_ACTION_TRIGGER</span></code> indicates a triggering event. It can be used
+with <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_BOOL</span></code> or <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_NONE</span></code> to trigger an
+interrupt, or with <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_EVENTFD</span></code> to generate an event when the
+server triggers the interrupt.</p></li>
+</ul>
+</li>
+<li><p><em>index</em> is the index of IRQ type being setup.</p></li>
+<li><p><em>start</em> is the start of the sub-index being set.</p></li>
+<li><p><em>count</em> describes the number of sub-indexes being set. As a special case, a
+count (and start) of 0, with data flags of <code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_NONE</span></code> disables
+all interrupts of the index.</p></li>
+<li><p><em>data</em> is an optional field included when the
+<code class="docutils literal notranslate"><span class="pre">VFIO_IRQ_SET_DATA_BOOL</span></code> flag is present. It contains an array of booleans
+that specify whether the action is to be performed on the corresponding
+index. It’s used when the action is only performed on a subset of the range
+specified.</p></li>
+</ul>
+<p>Not all interrupt types support every combination of data and action flags.
+The client must know the capabilities of the device and IRQ index before it
+sends a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQ</span></code> message.</p>
+<p>In typical operation, a specific IRQ may operate as follows:</p>
+<ol class="arabic simple">
+<li><p>The client sends a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQ</span></code> message with
+<code class="docutils literal notranslate"><span class="pre">flags=(VFIO_IRQ_SET_DATA_EVENTFD|VFIO_IRQ_SET_ACTION_TRIGGER)</span></code> along
+with an eventfd. This associates the IRQ with a particular eventfd on the
+server side.</p></li>
+<li><p>The client may send a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQ</span></code> message with
+<code class="docutils literal notranslate"><span class="pre">flags=(VFIO_IRQ_SET_DATA_EVENTFD|VFIO_IRQ_SET_ACTION_MASK/UNMASK)</span></code> along
+with another eventfd. This associates the given eventfd with the
+mask/unmask state on the server side.</p></li>
+<li><p>The server may trigger the IRQ by writing 1 to the eventfd.</p></li>
+<li><p>The server may mask/unmask an IRQ which will write 1 to the corresponding
+mask/unmask eventfd, if there is one.</p></li>
+</ol>
+<ol class="arabic simple" start="5">
+<li><p>A client may trigger a device IRQ itself, by sending a
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQ</span></code> message with
+<code class="docutils literal notranslate"><span class="pre">flags=(VFIO_IRQ_SET_DATA_NONE/BOOL|VFIO_IRQ_SET_ACTION_TRIGGER)</span></code>.</p></li>
+<li><p>A client may mask or unmask the IRQ, by sending a
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_SET_IRQ</span></code> message with
+<code class="docutils literal notranslate"><span class="pre">flags=(VFIO_IRQ_SET_DATA_NONE/BOOL|VFIO_IRQ_SET_ACTION_MASK/UNMASK)</span></code>.</p></li>
+</ol>
+</section>
+<section id="id15">
+<h4><a class="toc-backref" href="#id88" role="doc-backlink">Reply</a><a class="headerlink" href="#id15" title="Link to this heading"></a></h4>
+<p>There is no payload in the reply.</p>
+<p id="read-and-write-operations">Note that all of these operations must be supported by the client and/or server,
+even if the corresponding memory or device region has been shared as mappable.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">count</span></code> field must not exceed the value of <code class="docutils literal notranslate"><span class="pre">max_data_xfer_size</span></code> of the
+peer, for both reads and writes.</p>
+</section>
+</section>
+<section id="vfio-user-region-read">
+<h3><a class="toc-backref" href="#id89" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_READ</span></code></a><a class="headerlink" href="#vfio-user-region-read" title="Link to this heading"></a></h3>
+<p>If a device region is not mappable, it’s not directly accessible by the client
+via <code class="docutils literal notranslate"><span class="pre">mmap()</span></code> of the underlying file descriptor. In this case, a client can
+read from a device region with this message.</p>
+<section id="id16">
+<h4><a class="toc-backref" href="#id90" role="doc-backlink">Request</a><a class="headerlink" href="#id16" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>region</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>offset</em> into the region being accessed.</p></li>
+<li><p><em>region</em> is the index of the region being accessed.</p></li>
+<li><p><em>count</em> is the size of the data to be transferred.</p></li>
+</ul>
+</section>
+<section id="id17">
+<h4><a class="toc-backref" href="#id91" role="doc-backlink">Reply</a><a class="headerlink" href="#id17" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>region</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>data</p></td>
+<td><p>16</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>offset</em> into the region accessed.</p></li>
+<li><p><em>region</em> is the index of the region accessed.</p></li>
+<li><p><em>count</em> is the size of the data transferred.</p></li>
+<li><p><em>data</em> is the data that was read from the device region.</p></li>
+</ul>
+</section>
+</section>
+<section id="vfio-user-region-write">
+<h3><a class="toc-backref" href="#id92" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE</span></code></a><a class="headerlink" href="#vfio-user-region-write" title="Link to this heading"></a></h3>
+<p>If a device region is not mappable, it’s not directly accessible by the client
+via mmap() of the underlying fd. In this case, a client can write to a device
+region with this message.</p>
+<section id="id18">
+<h4><a class="toc-backref" href="#id93" role="doc-backlink">Request</a><a class="headerlink" href="#id18" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>region</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>data</p></td>
+<td><p>16</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>offset</em> into the region being accessed.</p></li>
+<li><p><em>region</em> is the index of the region being accessed.</p></li>
+<li><p><em>count</em> is the size of the data to be transferred.</p></li>
+<li><p><em>data</em> is the data to write</p></li>
+</ul>
+</section>
+<section id="id19">
+<h4><a class="toc-backref" href="#id94" role="doc-backlink">Reply</a><a class="headerlink" href="#id19" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>region</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>offset</em> into the region accessed.</p></li>
+<li><p><em>region</em> is the index of the region accessed.</p></li>
+<li><p><em>count</em> is the size of the data transferred.</p></li>
+</ul>
+</section>
+</section>
+<section id="vfio-user-dma-read">
+<h3><a class="toc-backref" href="#id95" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_READ</span></code></a><a class="headerlink" href="#vfio-user-dma-read" title="Link to this heading"></a></h3>
+<p>If the client has not shared mappable memory, the server can use this message to
+read from guest memory. This message and its reply are passed over the separate
+server-to-client socket if twin-socket mode has been negotiated during
+connection setup.</p>
+<section id="id20">
+<h4><a class="toc-backref" href="#id96" role="doc-backlink">Request</a><a class="headerlink" href="#id20" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>address</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>count</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>address</em> is the client DMA memory address being accessed. This address must have
+been previously exported to the server with a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code> message.</p></li>
+<li><p><em>count</em> is the size of the data to be transferred.</p></li>
+</ul>
+</section>
+<section id="id21">
+<h4><a class="toc-backref" href="#id97" role="doc-backlink">Reply</a><a class="headerlink" href="#id21" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>address</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>count</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-even"><td><p>data</p></td>
+<td><p>16</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>address</em> is the client DMA memory address being accessed.</p></li>
+<li><p><em>count</em> is the size of the data transferred.</p></li>
+<li><p><em>data</em> is the data read.</p></li>
+</ul>
+<p>Note that whether short reads return an error or just set count appropriately is
+a client-side choice; servers should be prepared to handle both cases.</p>
+</section>
+</section>
+<section id="vfio-user-dma-write">
+<h3><a class="toc-backref" href="#id98" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_WRITE</span></code></a><a class="headerlink" href="#vfio-user-dma-write" title="Link to this heading"></a></h3>
+<p>If the client has not shared mappable memory, the server can use this message to
+write to guest memory. This message and its reply are passed over the separate
+server-to-client socket if twin-socket mode has been negotiated during
+connection setup.</p>
+<section id="id22">
+<h4><a class="toc-backref" href="#id99" role="doc-backlink">Request</a><a class="headerlink" href="#id22" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>address</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>count</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-even"><td><p>data</p></td>
+<td><p>16</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>address</em> is the client DMA memory address being accessed. This address must have
+been previously exported to the server with a <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DMA_MAP</span></code> message.</p></li>
+<li><p><em>count</em> is the size of the data to be transferred.</p></li>
+<li><p><em>data</em> is the data to write</p></li>
+</ul>
+</section>
+<section id="id23">
+<h4><a class="toc-backref" href="#id100" role="doc-backlink">Reply</a><a class="headerlink" href="#id23" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>address</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>count</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>address</em> is the client DMA memory address being accessed.</p></li>
+<li><p><em>count</em> is the size of the data transferred.</p></li>
+</ul>
+<p>Note that whether short writes return an error or just set count appropriately
+is a client-side choice; servers should be prepared to handle both cases.</p>
+</section>
+</section>
+<section id="vfio-user-device-reset">
+<h3><a class="toc-backref" href="#id101" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_RESET</span></code></a><a class="headerlink" href="#vfio-user-device-reset" title="Link to this heading"></a></h3>
+<p>This command message is sent from the client to the server to reset the device.
+Neither the request or reply have a payload.</p>
+</section>
+<section id="vfio-user-region-write-multi">
+<h3><a class="toc-backref" href="#id102" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_REGION_WRITE_MULTI</span></code></a><a class="headerlink" href="#vfio-user-region-write-multi" title="Link to this heading"></a></h3>
+<p>This message can be used to coalesce multiple device write operations
+into a single messgage.  It is only used as an optimization when the
+outgoing message queue is relatively full.</p>
+<section id="id24">
+<h4><a class="toc-backref" href="#id103" role="doc-backlink">Request</a><a class="headerlink" href="#id24" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>wr_cnt</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>wrs</p></td>
+<td><p>8</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>wr_cnt</em> is the number of device writes coalesced in the message</p></li>
+<li><p><em>wrs</em> is an array of device writes defined below</p></li>
+</ul>
+<section id="single-device-write-format">
+<h5><a class="toc-backref" href="#id104" role="doc-backlink">Single Device Write Format</a><a class="headerlink" href="#single-device-write-format" title="Link to this heading"></a></h5>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>offset</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>region</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>count</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>data</p></td>
+<td><p>16</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>offset</em> into the region being accessed.</p></li>
+<li><p><em>region</em> is the index of the region being accessed.</p></li>
+<li><p><em>count</em> is the size of the data to be transferred.  This format can
+only describe writes of 8 bytes or less.</p></li>
+<li><p><em>data</em> is the data to write.</p></li>
+</ul>
+</section>
+</section>
+<section id="id25">
+<h4><a class="toc-backref" href="#id105" role="doc-backlink">Reply</a><a class="headerlink" href="#id25" title="Link to this heading"></a></h4>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>wr_cnt</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>wr_cnt</em> is the number of device writes completed.</p></li>
+</ul>
+</section>
+</section>
+<section id="vfio-user-device-feature">
+<h3><a class="toc-backref" href="#id106" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_FEATURE</span></code></a><a class="headerlink" href="#vfio-user-device-feature" title="Link to this heading"></a></h3>
+<p>This command is analogous to <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE</span></code>. It is used to get, set, or
+probe feature data of the device.</p>
+<section id="id26">
+<h4><a class="toc-backref" href="#id107" role="doc-backlink">Request</a><a class="headerlink" href="#id26" title="Link to this heading"></a></h4>
+<p>The request payload for this message is a structure of the following format.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>flags</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0 to 15</p></td>
+<td><p>Feature index</p></td>
+</tr>
+<tr class="row-odd"><td><p>16</p></td>
+<td><p>VFIO_DEVICE_FEATURE_GET</p></td>
+</tr>
+<tr class="row-even"><td><p>17</p></td>
+<td><p>VFIO_DEVICE_FEATURE_SET</p></td>
+</tr>
+<tr class="row-odd"><td><p>18</p></td>
+<td><p>VFIO_DEVICE_FEATURE_PROBE</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr class="row-odd"><td><p>data</p></td>
+<td><p>8</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><p><em>argsz</em> is the maximum size of the reply payload.</p></li>
+<li><p><em>flags</em> defines the action to be performed by the server and upon which
+feature:</p>
+<ul class="simple">
+<li><p>The feature index consists of the least significant 16 bits of the flags
+field, and can be accessed using the <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_MASK</span></code> bit mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_GET</span></code> instructs the server to get the data for the
+given feature.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_SET</span></code> instructs the server to set the feature data to
+that given in the <code class="docutils literal notranslate"><span class="pre">data</span></code> field of the payload.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_PROBE</span></code> instructs the server to probe for feature
+support. If <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_GET</span></code> and/or <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_SET</span></code>
+are also set, the probe will only return success if all of the indicated
+methods are supported.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_GET</span></code> and <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_SET</span></code> are mutually
+exclusive, except for use with <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_PROBE</span></code>.</p>
+</li>
+<li><p><em>data</em> is specific to the particular feature. It is not used for probing.</p></li>
+</ul>
+<p>This part of the request is analogous to VFIO’s <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">vfio_device_feature</span></code>.</p>
+</section>
+<section id="id27">
+<h4><a class="toc-backref" href="#id108" role="doc-backlink">Reply</a><a class="headerlink" href="#id27" title="Link to this heading"></a></h4>
+<p>The reply payload must be the same as the request payload for setting or
+probing a feature. For getting a feature’s data, the data is added in the data
+section and its length is added to <code class="docutils literal notranslate"><span class="pre">argsz</span></code>.</p>
+</section>
+<section id="device-features">
+<h4><a class="toc-backref" href="#id109" role="doc-backlink">Device Features</a><a class="headerlink" href="#device-features" title="Link to this heading"></a></h4>
+<p>The only device features supported by vfio-user are those related to migration,
+although this may change in the future. They are a subset of those supported in
+the VFIO implementation of the Linux kernel.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Feature Index</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>VFIO_DEVICE_FEATURE_MIGRATION</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-odd"><td><p>VFIO_DEVICE_FEATURE_MIG_DEVICE_STATE</p></td>
+<td><p>2</p></td>
+</tr>
+<tr class="row-even"><td><p>VFIO_DEVICE_FEATURE_DMA_LOGGING_START</p></td>
+<td><p>6</p></td>
+</tr>
+<tr class="row-odd"><td><p>VFIO_DEVICE_FEATURE_DMA_LOGGING_STOP</p></td>
+<td><p>7</p></td>
+</tr>
+<tr class="row-even"><td><p>VFIO_DEVICE_FEATURE_DMA_LOGGING_REPORT</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<section id="vfio-device-feature-migration">
+<h5><a class="toc-backref" href="#id110" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_MIGRATION</span></code></a><a class="headerlink" href="#vfio-device-feature-migration" title="Link to this heading"></a></h5>
+<p>This feature indicates that the device can support the migration API through
+<code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_MIG_DEVICE_STATE</span></code>. If <code class="docutils literal notranslate"><span class="pre">GET</span></code> succeeds, the <code class="docutils literal notranslate"><span class="pre">RUNNING</span></code>
+and <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> states are always supported. Support for additional states is
+indicated via the flags field; at least <code class="docutils literal notranslate"><span class="pre">VFIO_MIGRATION_STOP_COPY</span></code> must be
+set.</p>
+<p>There is no data field of the request message.</p>
+<p>The data field of the reply message is structured as follows:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>flags</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td colspan="2"><table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Definition</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>VFIO_MIGRATION_STOP_COPY</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>VFIO_MIGRATION_P2P</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>VFIO_MIGRATION_PRE_COPY</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<p>These flags are interpreted in the same way as VFIO.</p>
+</section>
+<section id="vfio-device-feature-mig-device-state">
+<h5><a class="toc-backref" href="#id111" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_MIG_DEVICE_STATE</span></code></a><a class="headerlink" href="#vfio-device-feature-mig-device-state" title="Link to this heading"></a></h5>
+<p>Upon <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_SET</span></code>, execute a migration state change on the VFIO
+device. The new state is supplied in <code class="docutils literal notranslate"><span class="pre">device_state</span></code>. The state transition must
+fully complete before the reply is sent.</p>
+<p>The data field of the reply message, as well as the <code class="docutils literal notranslate"><span class="pre">SET</span></code> request message, is
+structured as follows:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>device_state</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>data_fd</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>device_state</em> is the current state of the device (for <code class="docutils literal notranslate"><span class="pre">GET</span></code>) or the
+state to transition to (for <code class="docutils literal notranslate"><span class="pre">SET</span></code>). It is defined by the
+<code class="docutils literal notranslate"><span class="pre">vfio_device_mig_state</span></code> enum as detailed below. These states are the states
+of the device migration Finite State Machine.</p></li>
+</ul>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>State</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>VFIO_DEVICE_STATE_ERROR</p></td>
+<td><p>0</p></td>
+<td><p>The device has failed and must be reset.</p></td>
+</tr>
+<tr class="row-odd"><td><p>VFIO_DEVICE_STATE_STOP</p></td>
+<td><p>1</p></td>
+<td><p>The device does not change the internal or external state.</p></td>
+</tr>
+<tr class="row-even"><td><p>VFIO_DEVICE_STATE_RUNNING</p></td>
+<td><p>2</p></td>
+<td><p>The device is running normally.</p></td>
+</tr>
+<tr class="row-odd"><td><p>VFIO_DEVICE_STATE_STOP_COPY</p></td>
+<td><p>3</p></td>
+<td><p>The device internal state can be read out.</p></td>
+</tr>
+<tr class="row-even"><td><p>VFIO_DEVICE_STATE_RESUMING</p></td>
+<td><p>4</p></td>
+<td><p>The device is stopped and is loading a new internal state.</p></td>
+</tr>
+<tr class="row-odd"><td><p>VFIO_DEVICE_STATE_RUNNING_P2P</p></td>
+<td><p>5</p></td>
+<td><p>(not used in vfio-user)</p></td>
+</tr>
+<tr class="row-even"><td><p>VFIO_DEVICE_STATE_PRE_COPY</p></td>
+<td><p>6</p></td>
+<td><p>The device is running normally but tracking internal state changes.</p></td>
+</tr>
+<tr class="row-odd"><td><p>VFIO_DEVICE_STATE_PRE_COPY_P2P</p></td>
+<td><p>7</p></td>
+<td><p>(not used in vfio-user)</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>data_fd</em> is unused in vfio-user, as the <code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_READ</span></code> and
+<code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_WRITE</span></code> messages are used instead for migration data
+transport.</p></li>
+</ul>
+</section>
+<section id="direct-state-transitions">
+<h5><a class="toc-backref" href="#id112" role="doc-backlink">Direct State Transitions</a><a class="headerlink" href="#direct-state-transitions" title="Link to this heading"></a></h5>
+<p>The device migration FSM is a Mealy machine, so actions are taken upon the arcs
+between FSM states. The following transitions need to be supported by the
+server, a subset of those defined in <code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code>
+(<code class="docutils literal notranslate"><span class="pre">enum</span> <span class="pre">vfio_device_mig_state</span></code>).</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RUNNING</span> <span class="pre">-&gt;</span> <span class="pre">STOP</span></code>, <code class="docutils literal notranslate"><span class="pre">STOP_COPY</span> <span class="pre">-&gt;</span> <span class="pre">STOP</span></code>: Stop the operation of the device.
+The <code class="docutils literal notranslate"><span class="pre">STOP_COPY</span></code> arc terminates the data transfer session.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RESUMING</span> <span class="pre">-&gt;</span> <span class="pre">STOP</span></code>: Terminate the data transfer session. Complete processing
+of the migration data. Stop the operation of the device. If the delivered data
+is found to be incomplete, inconsistent, or otherwise invalid, fail the
+<code class="docutils literal notranslate"><span class="pre">SET</span></code> command and optionally transition to the <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> state.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PRE_COPY</span> <span class="pre">-&gt;</span> <span class="pre">RUNNING</span></code>: Terminate the data transfer session. The device is
+now fully operational.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STOP</span> <span class="pre">-&gt;</span> <span class="pre">RUNNING</span></code>: Start the operation of the device.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RUNNING</span> <span class="pre">-&gt;</span> <span class="pre">PRE_COPY</span></code>, <code class="docutils literal notranslate"><span class="pre">STOP</span> <span class="pre">-&gt;</span> <span class="pre">STOP_COPY</span></code>: Begin the process of saving
+the device state. The device operation is unchanged, but data transfer begins.
+<code class="docutils literal notranslate"><span class="pre">PRE_COPY</span></code> and <code class="docutils literal notranslate"><span class="pre">STOP_COPY</span></code> are referred to as the “saving group” of
+states.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PRE_COPY</span> <span class="pre">-&gt;</span> <span class="pre">STOP_COPY</span></code>: Continue to transfer migration data, but stop
+device operation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STOP</span> <span class="pre">-&gt;</span> <span class="pre">RESUMING</span></code>: Start the process of restoring the device state. The
+internal device state may be changed to prepare the device to receive the
+migration data.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">STOP_COPY</span> <span class="pre">-&gt;</span> <span class="pre">PRE_COPY</span></code> transition is explicitly not allowed and should
+return an error if requested.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ERROR</span></code> cannot be specified as a device state, but any transition request can
+be failed and then move the state into <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> if the server was unable to
+execute the requested arc AND was unable to restore the device into any valid
+state. To recover from <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, <code class="docutils literal notranslate"><span class="pre">VFIO_USER_DEVICE_RESET</span></code> must be used to
+return back to <code class="docutils literal notranslate"><span class="pre">RUNNING</span></code>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">PRE_COPY</span></code> is not supported, arcs touching it are removed.</p>
+</section>
+<section id="complex-state-transitions">
+<h5><a class="toc-backref" href="#id113" role="doc-backlink">Complex State Transitions</a><a class="headerlink" href="#complex-state-transitions" title="Link to this heading"></a></h5>
+<p>The remaining possible transitions are to be implemented as combinations of the
+above FSM arcs. As there are multiple paths, the path should be selected based
+on the following rules:</p>
+<ul class="simple">
+<li><p>Select the shortest path.</p></li>
+<li><p>The path cannot have saving group states as interior arcs, only start/end
+states.</p></li>
+</ul>
+</section>
+<section id="vfio-device-feature-dma-logging-start-vfio-device-feature-dma-logging-stop">
+<h5><a class="toc-backref" href="#id114" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_START</span></code> / <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_STOP</span></code></a><a class="headerlink" href="#vfio-device-feature-dma-logging-start-vfio-device-feature-dma-logging-stop" title="Link to this heading"></a></h5>
+<p>Upon <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_SET</span></code>, start/stop DMA logging. These features can
+also be probed to determine whether the device supports DMA logging.</p>
+<p>When DMA logging is started, a range of IOVAs to monitor is provided and the
+device can optimize its logging to cover only the IOVA range given. Only DMA
+writes are logged.</p>
+<p>The data field of the <code class="docutils literal notranslate"><span class="pre">SET</span></code> request is structured as follows:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>page_size</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>num_ranges</p></td>
+<td><p>8</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>reserved</p></td>
+<td><p>12</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>ranges</p></td>
+<td><p>16</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>page_size</em> hints what tracking granularity the device should try to achieve.
+If the device cannot do the hinted page size then it’s the driver’s choice
+which page size to pick based on its support. On output the device will return
+the page size it selected.</p></li>
+<li><p><em>num_ranges</em> is the number of IOVA ranges to monitor. A value of zero
+indicates that all writes should be logged.</p></li>
+<li><p><em>ranges</em> is an array of <code class="docutils literal notranslate"><span class="pre">vfio_user_device_feature_dma_logging_range</span></code>
+entries:</p></li>
+</ul>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>iova</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>length</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<div><ul class="simple">
+<li><p><em>iova</em> is the base IO virtual address</p></li>
+<li><p><em>length</em> is the length of the range to log</p></li>
+</ul>
+</div></blockquote>
+<p>Upon success, the response data field will be the same as the request, unless
+the page size was changed, in which case this will be reflected in the response.</p>
+</section>
+<section id="vfio-device-feature-dma-logging-report">
+<h5><a class="toc-backref" href="#id115" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_REPORT</span></code></a><a class="headerlink" href="#vfio-device-feature-dma-logging-report" title="Link to this heading"></a></h5>
+<p>Upon <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_GET</span></code>, returns the dirty bitmap for a specific IOVA
+range. This operation is only valid if logging of dirty pages has been
+previously started by setting <code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_START</span></code>.</p>
+<p>The data field of the request is structured as follows:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>iova</p></td>
+<td><p>0</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-odd"><td><p>length</p></td>
+<td><p>8</p></td>
+<td><p>8</p></td>
+</tr>
+<tr class="row-even"><td><p>page_size</p></td>
+<td><p>16</p></td>
+<td><p>8</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>iova</em> is the base IO virtual address</p></li>
+<li><p><em>length</em> is the length of the range</p></li>
+<li><p><em>page_size</em> is the unit of granularity of the bitmap, and must be a power of
+two. It doesn’t have to match the value given to
+<code class="docutils literal notranslate"><span class="pre">VFIO_DEVICE_FEATURE_DMA_LOGGING_START</span></code> because the driver will format its
+internal logging to match the reporting page size possibly by replicating bits
+if the internal page size is lower than requested</p></li>
+</ul>
+<p>The data field of the response is identical, except with the bitmap added on
+the end at offset 24.</p>
+<p>The bitmap is an array of u64s that holds the output bitmap, with 1 bit
+reporting a <em>page_size</em> unit of IOVA. The bits outside of the requested range
+must be zero.</p>
+<p>The mapping of IOVA to bits is given by:</p>
+<p><code class="docutils literal notranslate"><span class="pre">bitmap[(addr</span> <span class="pre">-</span> <span class="pre">iova)/page_size]</span> <span class="pre">&amp;</span> <span class="pre">(1ULL</span> <span class="pre">&lt;&lt;</span> <span class="pre">(addr</span> <span class="pre">%</span> <span class="pre">64))</span></code></p>
+</section>
+</section>
+</section>
+<section id="vfio-user-mig-data-read">
+<h3><a class="toc-backref" href="#id116" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_READ</span></code></a><a class="headerlink" href="#vfio-user-mig-data-read" title="Link to this heading"></a></h3>
+<p>This command is used to read data from the source migration server while it is
+in a saving group state (<code class="docutils literal notranslate"><span class="pre">PRE_COPY</span></code> or <code class="docutils literal notranslate"><span class="pre">STOP_COPY</span></code>).</p>
+<p>This command, and <code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_WRITE</span></code>, are used in place of the
+<code class="docutils literal notranslate"><span class="pre">data_fd</span></code> file descriptor in <code class="docutils literal notranslate"><span class="pre">&lt;linux/vfio.h&gt;</span></code>
+(<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">vfio_device_feature_mig_state</span></code>) to enable all data transport to use
+the single already-established UNIX socket. Hence, the migration data is
+treated like a stream, so the client must continue reading until no more
+migration data remains.</p>
+<section id="id28">
+<h4><a class="toc-backref" href="#id117" role="doc-backlink">Request</a><a class="headerlink" href="#id28" title="Link to this heading"></a></h4>
+<p>The request payload for this message is a structure of the following format.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the maximum size of the reply payload.</p></li>
+<li><p><em>size</em> is the size of the migration data to read.</p></li>
+</ul>
+</section>
+<section id="id29">
+<h4><a class="toc-backref" href="#id118" role="doc-backlink">Reply</a><a class="headerlink" href="#id29" title="Link to this heading"></a></h4>
+<p>The reply payload for this message is a structure of the following format.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>data</p></td>
+<td><p>8</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the size of the above structure, including the size of the data.</p></li>
+<li><p><em>size</em> indicates the size of returned migration data. If this is less than the
+requested size, there is no more migration data to read.</p></li>
+<li><p><em>data</em> contains the migration data.</p></li>
+</ul>
+</section>
+</section>
+<section id="vfio-user-mig-data-write">
+<h3><a class="toc-backref" href="#id119" role="doc-backlink"><code class="docutils literal notranslate"><span class="pre">VFIO_USER_MIG_DATA_WRITE</span></code></a><a class="headerlink" href="#vfio-user-mig-data-write" title="Link to this heading"></a></h3>
+<p>This command is used to write data to the destination migration server while it
+is in the <code class="docutils literal notranslate"><span class="pre">RESUMING</span></code> state.</p>
+<p>As above, this replaces the <code class="docutils literal notranslate"><span class="pre">data_fd</span></code> file descriptor for transport of
+migration data, and as such, the migration data is treated like a stream.</p>
+<section id="id30">
+<h4><a class="toc-backref" href="#id120" role="doc-backlink">Request</a><a class="headerlink" href="#id30" title="Link to this heading"></a></h4>
+<p>The request payload for this message is a structure of the following format.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Offset</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>argsz</p></td>
+<td><p>0</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-odd"><td><p>size</p></td>
+<td><p>4</p></td>
+<td><p>4</p></td>
+</tr>
+<tr class="row-even"><td><p>data</p></td>
+<td><p>8</p></td>
+<td><p>variable</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p><em>argsz</em> is the maximum size of the reply payload.</p></li>
+<li><p><em>size</em> is the size of the migration data to be written.</p></li>
+<li><p><em>data</em> contains the migration data.</p></li>
+</ul>
+</section>
+<section id="id31">
+<h4><a class="toc-backref" href="#id121" role="doc-backlink">Reply</a><a class="headerlink" href="#id31" title="Link to this heading"></a></h4>
+<p>There is no reply payload for this message.</p>
+</section>
+</section>
+</section>
+<section id="appendices">
+<h2><a class="toc-backref" href="#id122" role="doc-backlink">Appendices</a><a class="headerlink" href="#appendices" title="Link to this heading"></a></h2>
+<section id="unused-vfio-ioctl-commands">
+<h3><a class="toc-backref" href="#id123" role="doc-backlink">Unused VFIO <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> commands</a><a class="headerlink" href="#unused-vfio-ioctl-commands" title="Link to this heading"></a></h3>
+<p>The following VFIO commands do not have an equivalent vfio-user command:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_GET_API_VERSION</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_CHECK_EXTENSION</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_SET_IOMMU</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_GROUP_GET_STATUS</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_GROUP_SET_CONTAINER</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_GROUP_UNSET_CONTAINER</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_GROUP_GET_DEVICE_FD</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VFIO_IOMMU_GET_INFO</span></code></p></li>
+</ul>
+<p>However, once support for live migration for VFIO devices is finalized some
+of the above commands may have to be handled by the client in their
+corresponding vfio-user form. This will be addressed in a future protocol
+version.</p>
+<section id="vfio-groups-and-containers">
+<h4><a class="toc-backref" href="#id124" role="doc-backlink">VFIO groups and containers</a><a class="headerlink" href="#vfio-groups-and-containers" title="Link to this heading"></a></h4>
+<p>The current VFIO implementation includes group and container idioms that
+describe how a device relates to the host IOMMU. In the vfio-user
+implementation, the IOMMU is implemented in SW by the client, and is not
+visible to the server. The simplest idea would be that the client put each
+device into its own group and container.</p>
+</section>
+</section>
+<section id="backend-program-conventions">
+<h3><a class="toc-backref" href="#id125" role="doc-backlink">Backend Program Conventions</a><a class="headerlink" href="#backend-program-conventions" title="Link to this heading"></a></h3>
+<p>vfio-user backend program conventions are based on the vhost-user ones.</p>
+<ul class="simple">
+<li><p>The backend program must not daemonize itself.</p></li>
+<li><p>No assumptions must be made as to what access the backend program has on the
+system.</p></li>
+<li><p>File descriptors 0, 1 and 2 must exist, must have regular
+stdin/stdout/stderr semantics, and can be redirected.</p></li>
+<li><p>The backend program must honor the SIGTERM signal.</p></li>
+<li><p>The backend program must accept the following commands line options:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--socket-path=PATH</span></code>: path to UNIX domain socket,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--fd=FDNUM</span></code>: file descriptor for UNIX domain socket, incompatible with
+<code class="docutils literal notranslate"><span class="pre">--socket-path</span></code></p></li>
+</ul>
+</li>
+<li><p>The backend program must be accompanied with a JSON file stored under
+<code class="docutils literal notranslate"><span class="pre">/usr/share/vfio-user</span></code>.</p></li>
+</ul>
+<p>TODO add schema similar to docs/interop/vhost-user.json.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qemu-storage-daemon-qmp-ref.html" class="btn btn-neutral float-left" title="QEMU Storage Daemon QMP Reference Manual" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="vhost-user.html" class="btn btn-neutral float-right" title="Vhost-user Protocol" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, The QEMU Project Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+
+<!-- Empty para to force a blank line after "Built with Sphinx ..." -->
+<p></p>
+
+<p>This documentation is for QEMU version 11.0.50.</p>
+
+
+<p><a href="../about/license.html">QEMU and this manual are released under the
+GNU General Public License, version 2.</a></p>
+
+ 
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

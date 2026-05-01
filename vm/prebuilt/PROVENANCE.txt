@@ -1,0 +1,274 @@
+Provenance record for vm/prebuilt/
+===================================
+
+This file records exact SHA256 hashes of every input and output
+involved in producing the committed prebuilt binaries. Anyone
+auditing this repository can use these hashes to:
+
+  1. Verify the committed binaries match what the recipe produces.
+  2. Detect if any input has drifted between runs.
+  3. Reproduce the build offline from the vendored sources.
+
+For the operational maintainer workflow (vendoring, rebuilding,
+release packaging), see MAINTAINERS.md at the repository root.
+For end-user-facing notes about each binary's role, see this
+directory's README.md.
+
+Most recent rebuild: 2026-04-27 (cleanup-phase-1 cold-clone
+verification). Recipe: scripts/build-slmodemd-in-vm.sh +
+scripts/build-pjsip-in-vm.sh.
+
+────────────────────────────────────────────────────────────────
+Output binary hashes
+────────────────────────────────────────────────────────────────
+
+vm/prebuilt/slmodemd
+  Size:        1651860 bytes
+  SHA256:      afc732f3e39ec643f8cf9b66e34d338505775858d06a261e085be917a92305e8
+  Type:        ELF 32-bit LSB PIE executable, Intel 80386
+  Interpreter: /lib/ld-linux.so.2
+  Debug info:  retained (not stripped)
+  Built by:    scripts/build-slmodemd-in-vm.sh
+
+vm/prebuilt/d-modem
+  Size:        1778268 bytes
+  SHA256:      b82491fb13a81805af03f70f34ef15a27df3f5ef21f285f1def0d33573d6e876
+  Type:        ELF 32-bit LSB PIE executable, Intel 80386
+  Interpreter: /lib/ld-linux.so.2
+  Debug info:  retained (not stripped)
+  Notes:       PJSIP-linked helper used by the slmodemd-pjsip
+               backend. Statically links pjsua-lib + pjsip + pjmedia
+               + pjnath + pjlib-util + pjlib + resample. d-modem.c
+               carries Copyright (C) 2021 Aon plc under
+               GPL-2.0-or-later (licenses/D-MODEM-NOTICE).
+  Built by:    scripts/build-pjsip-in-vm.sh
+
+vm/prebuilt/modemd-tunnel-i386
+  Size:        20184 bytes
+  SHA256:      ec691802dadbde9b8dcef5b7970b673bfd124ff1b1e40354fcf100d4f0112ef5
+  Type:        ELF 32-bit LSB PIE executable, Intel 80386
+  Interpreter: /lib/ld-linux.so.2
+  Notes:       UDP-over-TCP tunnel, in-VM endpoint. Bridges PJSIP
+               UDP (loopback) to a TCP virtio-serial chardev. Wire
+               protocol documented at vm/tunnel/PROTOCOL.md.
+  Built by:    scripts/build-pjsip-in-vm.sh (same VM session as d-modem)
+
+vm/prebuilt/modemd-ctrl-i386
+  Size:        20360 bytes
+  SHA256:      d5c94799e04c3148b0fb6865f4cce4020db82dad64397fdeb9b49939cd2573e8
+  Type:        ELF 32-bit LSB PIE executable, Intel 80386
+  Interpreter: /lib/ld-linux.so.2
+  Notes:       PTY ↔ control-channel bridge for slmodemd's AT
+               command interface. Embeds `git describe --dirty` as
+               BUILD_ID; rebuilding from a dirty working tree
+               produces a different hash than rebuilding from a
+               clean checkout, even though the binary is otherwise
+               byte-identical.
+  Built by:    scripts/build-pjsip-in-vm.sh (same VM session as d-modem)
+
+vm/prebuilt/pjsip-test-peer-i386
+  Size:        1764924 bytes
+  SHA256:      2d7c60caaaf3c09192e6aa1f0829d9b87369270e44e052f89cfb92d46c497bc9
+  Type:        ELF 32-bit LSB PIE executable, Intel 80386
+  Interpreter: /lib/ld-linux.so.2
+  Debug info:  retained (not stripped)
+  Notes:       Test-only PJSIP UAS used by test/pjsip/* to give the
+               in-VM PJSIP something to talk to. Not used in
+               production. Statically links the same PJSIP set as
+               d-modem.
+  Built by:    scripts/build-pjsip-in-vm.sh (same VM session as d-modem)
+
+────────────────────────────────────────────────────────────────
+Highest glibc symbol version required
+────────────────────────────────────────────────────────────────
+
+  slmodemd:               GLIBC_2.34
+  d-modem:                GLIBC_2.34
+  modemd-tunnel-i386:     GLIBC_2.34
+  modemd-ctrl-i386:       GLIBC_2.34
+  pjsip-test-peer-i386:   GLIBC_2.34
+
+All well under the runtime VM's glibc 2.36. Zero `__isoc23_*`
+symbols (the C23-renamed glibc 2.38+ entry points) in any binary.
+This is the property the in-VM build process exists to guarantee.
+
+────────────────────────────────────────────────────────────────
+Build inputs
+────────────────────────────────────────────────────────────────
+
+Vendored slmodemd source (source-tree hash over *.c, *.h, Makefile):
+  SHA256 of all *.c/*.h/Makefile in vm/slmodemd/:
+    c5e2e457c128fb586afd62c78ab0a1c09f0eb90381615111c8eaca497f5ad6ec
+  (Upstream pin recorded in vm/slmodemd/UPSTREAM.txt.)
+
+dsplibs.o (Smart Link DSP blob, redistributed unmodified):
+  SHA256: 1129d826ca23f1e33aeb0eb8211ef0f91788e82549941a143e3181025d4fa10c
+
+PJSIP source tarball (corresponding source, GPL-2.0-or-later):
+  File:   vm/sources/pjproject-2.15.1.tar.gz
+  SHA256: 8f3bd99caf003f96ed8038b8a36031eb9d8cd9eaea1eaff7e01c2eef6bd55706
+  From:   https://github.com/pjsip/pjproject/archive/refs/tags/2.15.1.tar.gz
+
+d-modem.c source (vendored from synexo/D-Modem):
+  File:   vm/d-modem/d-modem.c
+  SHA256: c2e76759d9529bf467a918e128c5b3e15b4eaff0077d32bdc896a54e36a478a1
+  Upstream commit: 902c79aa36fa094c7513fa911b64f4fa8a0bf614
+
+PJSIP build customization (in-tree):
+  File:   vm/pjsip/config_site.h
+  SHA256: be5694b110db758135c937ab9f0d1bc18628f3e5c1f7b5df1827f33cecdfa525
+  (Empty file matching D-Modem's own config_site.h; all PJSIP
+  modem-specific behavior is set at runtime through d-modem.c.)
+
+PJSIP configure invocation:
+  ./configure --prefix=/build/pjsip.install \
+      --disable-video --disable-sound --disable-ssl \
+      --disable-libsrtp --disable-libyuv --disable-libwebrtc \
+      --disable-opus --disable-silk --disable-speex-codec \
+      --disable-speex-aec --disable-ilbc-codec --disable-gsm-codec \
+      --disable-g722-codec --disable-g7221-codec --disable-bcg729 \
+      --disable-opencore-amr --disable-sdl --disable-v4l2 \
+      --disable-ffmpeg --disable-openh264 --disable-vpx \
+      --disable-lyra --disable-upnp --disable-pjsua2
+
+────────────────────────────────────────────────────────────────
+Build VM environment
+────────────────────────────────────────────────────────────────
+
+Build VM kernel (same kernel that runs the runtime VM):
+  File: vm/kernel/bzImage
+  SHA256: 2bac10d87a024026de6c00539ea70d19194169b6b99111d9178815b470d77dbe
+  From: linux-image-6.1.0-42-686-pae-unsigned_6.1.159-1_i386.deb
+        SHA256: 1e0e56cba6241bd122a353e67406142afa13ff0406d2b8d926fb7554a944e57a
+        Debian bookworm pool/main/l/linux/
+
+Target runtime glibc (what the binaries link against):
+  File: vm/libc/libc.so.6
+  SHA256: 1c28c683ca0c3585415c1c8f3bef04e77f756fc84c70a0ba5d649e00d5a66160
+  From: libc6_2.36-9+deb12u13_i386.deb
+        SHA256: cc30f1ce0a1a836ecf7d713032dad45c924ba81e3934f78bf2b8c6f827117749
+        Debian bookworm pool/main/g/glibc/
+
+Toolchain (extracted from .deb, only used in builder initramfs, not shipped)
+----------------------------------------------------------------------------
+
+All from Debian bookworm, arch=i386. SHA256 values pinning the exact
+.deb files used live in scripts/fetch-vm-binaries.sh. The build
+scripts verify these hashes before extracting any toolchain into the
+builder rootfs.
+
+  gcc-12_12.2.0-14+deb12u1_i386.deb
+  cpp-12_12.2.0-14+deb12u1_i386.deb
+  gcc-12-base_12.2.0-14+deb12u1_i386.deb
+  libgcc-12-dev_12.2.0-14+deb12u1_i386.deb
+  libgcc-s1_12.2.0-14+deb12u1_i386.deb
+  libstdc++6_12.2.0-14+deb12u1_i386.deb
+  libstdc++-12-dev_12.2.0-14+deb12u1_i386.deb
+  libcc1-0_12.2.0-14+deb12u1_i386.deb
+  g++-12_12.2.0-14+deb12u1_i386.deb
+  binutils_2.40-2_i386.deb
+  binutils-common_2.40-2_i386.deb
+  binutils-i686-linux-gnu_2.40-2_i386.deb
+  libbinutils_2.40-2_i386.deb
+  libctf0_2.40-2_i386.deb
+  libctf-nobfd0_2.40-2_i386.deb
+  libjansson4_2.14-2_i386.deb
+  libgprofng0_2.40-2_i386.deb
+  libgmp10_6.2.1+dfsg1-1.1_i386.deb
+  libisl23_0.25-1.1_i386.deb
+  libmpc3_1.3.1-1_i386.deb
+  libmpfr6_4.2.0-1_i386.deb
+  libzstd1_1.5.4+dfsg2-5_i386.deb
+  zlib1g_1.2.13.dfsg-1_i386.deb
+  libc6_2.36-9+deb12u13_i386.deb
+  libc6-dev_2.36-9+deb12u13_i386.deb
+  libc-dev-bin_2.36-9+deb12u13_i386.deb
+  libcrypt1_4.4.33-2_i386.deb
+  libcrypt-dev_4.4.33-2_i386.deb
+  linux-libc-dev_6.1.159-1_i386.deb
+  make_4.3-4.1_i386.deb
+  pkg-config_1.8.1-1_i386.deb
+  pkgconf_1.8.1-1_i386.deb
+  pkgconf-bin_1.8.1-1_i386.deb
+  libpkgconf3_1.8.1-1_i386.deb
+  perl-base_5.36.0-7+deb12u3_i386.deb
+  sed_4.9-1_i386.deb
+  grep_3.8-5_i386.deb
+  libpcre2-8-0_10.42-1_i386.deb
+
+Compiler identification (as reported inside the build VM):
+  gcc (Debian 12.2.0-14+deb12u1) 12.2.0
+  GNU ld (GNU Binutils for Debian) 2.40
+  GNU Make 4.3
+
+Compile / link flags (slmodemd):
+  CFLAGS:  -Wall -g -O -I. -DCONFIG_DEBUG_MODEM
+           (from vm/slmodemd/Makefile, unmodified)
+  LDFLAGS: (none beyond defaults)
+
+Compile / link flags (in-VM helpers):
+  Use each helper's own Makefile under vm/tunnel/, vm/ctrl/,
+  vm/d-modem/, vm/pjsip-test-peer/. Inside the i386 VM, gcc's
+  default is already 32-bit, so the "native" target builds the
+  same i386 ELF that `gcc -m32` would produce on an amd64 host.
+
+Architecture note
+-----------------
+Build VM is i386. Inside, uname -m reports 'i686', so the slmodemd
+Makefile's ARCH64 detection sets CC to plain 'gcc' (not 'gcc -m32'),
+because we're already in 32-bit userspace. This is correct; on an
+amd64 host the same Makefile selects 'gcc -m32' instead, producing
+the same i386 ELF output but from a 64-bit toolchain.
+
+ALSA: not used. The vendored slmodemd Makefile has SUPPORT_ALSA=1
+commented out; our slmodemd builds without libasound, which keeps
+the dependency set minimal (libc.so.6 only).
+
+────────────────────────────────────────────────────────────────
+Shipped runtime image hashes (for reference)
+────────────────────────────────────────────────────────────────
+
+Once `make -C vm` runs, vm/images/ is populated with a bootable
+VM. These are deterministic outputs — `make clean && make` from
+a fresh checkout produces byte-identical files.
+
+vm/images/bzImage
+  Size:        5754864 bytes
+  SHA256:      2bac10d87a024026de6c00539ea70d19194169b6b99111d9178815b470d77dbe
+  Source:      verbatim copy of vm/kernel/bzImage
+
+vm/images/rootfs-slmodemd-pjsip.cpio.gz
+  Reproducibility: the Makefile's CPIO rule sets all file mtimes
+                   to epoch 0, sorts the file list with LC_ALL=C,
+                   passes --reproducible to cpio, and `gzip -n`
+                   to strip filename/timestamp from the gz header.
+                   Three consecutive clean builds produce the same
+                   SHA256.
+
+────────────────────────────────────────────────────────────────
+Verifying this record
+────────────────────────────────────────────────────────────────
+
+  sha256sum vm/prebuilt/slmodemd                # afc732f3...
+  sha256sum vm/prebuilt/d-modem                 # b82491fb...
+  sha256sum vm/prebuilt/modemd-tunnel-i386      # ec691802...
+  sha256sum vm/prebuilt/modemd-ctrl-i386        # d5c94799...
+  sha256sum vm/prebuilt/pjsip-test-peer-i386    # 2d7c60ca...
+  sha256sum vm/slmodemd/dsplibs.o               # 1129d826...
+  find vm/slmodemd -maxdepth 1 \( -name '*.c' -o -name '*.h' \
+                                  -o -name 'Makefile' \) -type f \
+    | sort | xargs sha256sum | sha256sum        # c5e2e457... (prefix)
+
+  # Reproducible-build check after `make -C vm`:
+  sha256sum vm/images/bzImage                   # 2bac10d8...
+
+To rebuild every prebuilt from scratch:
+
+  scripts/build-slmodemd-in-vm.sh
+  scripts/build-pjsip-in-vm.sh
+
+A reproduction hash that matches means nothing drifted. Note that
+modemd-ctrl-i386 embeds `git describe --dirty` as its BUILD_ID, so
+rebuilding from a dirty working tree will produce a different hash
+than the committed value even if the binary is otherwise
+byte-identical.

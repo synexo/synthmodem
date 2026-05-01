@@ -1,0 +1,29 @@
+# Node dependencies — run `npm install` to restore.
+node_modules/
+
+# Per-call audio captures and runtime debug dumps.
+captures/*
+!captures/.gitkeep
+
+# VM Makefile staging tree.
+vm/.rootfs-build/
+
+# Host-arch developer build artifacts under in-tree C source dirs.
+# Production binaries live under vm/prebuilt/, committed.
+vm/ctrl/modemd-ctrl
+vm/ctrl/modemd-ctrl-i386
+vm/tunnel/modemd-tunnel
+vm/slmodemd/slmodemd
+vm/slmodemd/modem_test
+vm/slmodemd/*.o
+!vm/slmodemd/dsplibs.o
+
+# Stray binary dumps and macOS metadata.
+*.raw
+.DS_Store
+
+# Native-addon build output (node-gyp).
+# Committed source-of-truth for the addon binary lives under
+# native/win-timer-resolution/prebuilt/<plat>-<arch>/.
+native/win-timer-resolution/build/
+/build/

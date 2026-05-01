@@ -1,0 +1,532 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Qemu COLO Fault Tolerance &mdash; QEMU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=f5127f15" />
+      <link rel="stylesheet" type="text/css" href="../_static/theme_overrides.css?v=b3ae9cc8" />
+
+  
+    <link rel="shortcut icon" href="../_static/qemu_32x32.png"/>
+      <script src="../_static/jquery.js?v=8dae8fb0"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3b5cce75"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/custom.js?v=2ab9f71d"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="User Mode Emulation" href="../user/index.html" />
+    <link rel="prev" title="Composable SR-IOV device" href="sriov.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #802400" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QEMU
+              <img src="../_static/qemu_128x128.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about/index.html">About QEMU</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">System Emulation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="invocation.html">Invocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="device-emulation.html">Device Emulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keys.html">Keys in the graphical frontends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mux-chardev.html">Keys in the character backend multiplexer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="monitor.html">QEMU Monitor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="images.html">Disk Images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio-net-failover.html">QEMU virtio-net standby (net_failover)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linuxboot.html">Direct Linux Boot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generic-loader.html">Generic Loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guest-loader.html">Guest Loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="barrier.html">QEMU Barrier Client</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vnc-security.html">VNC security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tls.html">TLS setup for network services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="secrets.html">Providing secret data to QEMU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="authz.html">Client authorization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gdb.html">GDB usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="replay.html">Record/replay</a></li>
+<li class="toctree-l2"><a class="reference internal" href="managed-startup.html">Managed start up options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bootindex.html">Managing device boot order with bootindex properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cpu-hotplug.html">Virtual CPU hotplug</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pr-manager.html">Persistent reservation managers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="targets.html">QEMU System Emulator Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi-process.html">Multi-process QEMU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="confidential-guest-support.html">Confidential Guest Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="igvm.html">Independent Guest Virtual Machine (IGVM) support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nitro.html">AWS Nitro Enclaves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="whpx.html">Windows Hypervisor Platform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vm-templating.html">QEMU VM templating</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sriov.html">Composable SR-IOV device</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Qemu COLO Fault Tolerance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#background">Background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#architecture">Architecture</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#components">Components</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#colo-operation-status">COLO operation status</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#test-procedure">Test procedure</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#setup">Setup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#startup-qemu">Startup qemu</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#failover-test">Failover test</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user/index.html">User Mode Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../interop/index.html">System Emulation Management and Interoperability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../specs/index.html">System Emulation Guest Hardware Specifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../devel/index.html">Developer Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #802400" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QEMU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">System Emulation</a></li>
+      <li class="breadcrumb-item active">Qemu COLO Fault Tolerance</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="https://gitlab.com/qemu-project/qemu/-/blob/master/docs/system/qemu-colo.rst">View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="qemu-colo-fault-tolerance">
+<h1>Qemu COLO Fault Tolerance<a class="headerlink" href="#qemu-colo-fault-tolerance" title="Link to this heading"></a></h1>
+<p>This document gives an overview of COLO’s design and how to use it.</p>
+<section id="background">
+<h2>Background<a class="headerlink" href="#background" title="Link to this heading"></a></h2>
+<p>Virtual machine (VM) replication is a well known technique for providing
+application-agnostic software-implemented hardware fault tolerance,
+also known as “non-stop service”.</p>
+<p>COLO (COarse-grained LOck-stepping) is a high availability solution.
+Both primary VM (PVM) and secondary VM (SVM) run in parallel. They receive the
+same request from client, and generate response in parallel too.
+If the response packets from PVM and SVM are identical, they are released
+immediately. Otherwise, a VM checkpoint (on demand) is conducted.</p>
+</section>
+<section id="architecture">
+<h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading"></a></h2>
+<p>The architecture of COLO is shown in the diagram below.
+It consists of a pair of networked physical nodes:
+The primary node running the PVM, and the secondary node running the SVM
+to maintain a valid replica of the PVM.
+PVM and SVM execute in parallel and generate output of response packets for
+client requests according to the application semantics.</p>
+<p>The incoming packets from the client or external network are received by the
+primary node, and then forwarded to the secondary node, so that both the PVM
+and the SVM are stimulated with the same requests.</p>
+<p>COLO receives the outbound packets from both the PVM and SVM and compares them
+before allowing the output to be sent to clients.</p>
+<p>The SVM is qualified as a valid replica of the PVM, as long as it generates
+identical responses to all client requests. Once the differences in the outputs
+are detected between the PVM and SVM, COLO withholds transmission of the
+outbound packets until it has successfully synchronized the PVM state to the SVM.</p>
+<p>Overview:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">Primary</span> <span class="n">Node</span>                                                            <span class="n">Secondary</span> <span class="n">Node</span>
+<span class="o">+------------+</span>  <span class="o">+-----------------------+</span>       <span class="o">+------------------------+</span>  <span class="o">+------------+</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>       <span class="n">HeartBeat</span>       <span class="o">+&lt;-----&gt;+</span>       <span class="n">HeartBeat</span>        <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span> <span class="n">Primary</span> <span class="n">VM</span> <span class="o">|</span>  <span class="o">+-----------+-----------+</span>       <span class="o">+-----------+------------+</span>  <span class="o">|</span><span class="n">Secondary</span> <span class="n">VM</span><span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>              <span class="o">|</span>                               <span class="o">|</span>               <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">+-----------|-----------+</span>       <span class="o">+-----------|------------+</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span><span class="n">QEMU</span>   <span class="o">+---</span><span class="n">v</span><span class="o">----+</span>      <span class="o">|</span>       <span class="o">|</span><span class="n">QEMU</span>  <span class="o">+----</span><span class="n">v</span><span class="o">---+</span>        <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>       <span class="o">|</span><span class="n">Failover</span><span class="o">|</span>      <span class="o">|</span>       <span class="o">|</span>      <span class="o">|</span><span class="n">Failover</span><span class="o">|</span>        <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>       <span class="o">+--------+</span>      <span class="o">|</span>       <span class="o">|</span>      <span class="o">+--------+</span>        <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>   <span class="o">+---------------+</span>   <span class="o">|</span>       <span class="o">|</span>   <span class="o">+---------------+</span>    <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>   <span class="o">|</span> <span class="n">VM</span> <span class="n">Checkpoint</span> <span class="o">+--------------&gt;+</span> <span class="n">VM</span> <span class="n">Checkpoint</span> <span class="o">|</span>    <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>   <span class="o">+---------------+</span>   <span class="o">|</span>       <span class="o">|</span>   <span class="o">+---------------+</span>    <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span><span class="n">Requests</span><span class="o">&lt;--------------------------</span>\ <span class="o">/-----------------</span>\ <span class="o">/---------------------&gt;</span><span class="n">Requests</span><span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>                   <span class="o">^</span> <span class="o">^</span> <span class="o">|</span>       <span class="o">|</span>       <span class="o">|</span> <span class="o">|</span>              <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span><span class="n">Responses</span><span class="o">+---------------------</span>\ <span class="o">/-|-|------------</span>\ <span class="o">/-------------------------+</span><span class="n">Responses</span><span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>               <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span>       <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span>              <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span> <span class="o">+-----------+</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span>       <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span> <span class="o">+----------+</span> <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span> <span class="n">COLO</span> <span class="n">disk</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span>       <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span> <span class="o">|</span> <span class="n">COLO</span> <span class="n">disk</span><span class="o">|</span> <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span> <span class="o">|</span>   <span class="n">Manager</span> <span class="o">+----------------------------&gt;|</span> <span class="n">Manager</span>  <span class="o">|</span> <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span> <span class="o">++----------+</span> <span class="n">v</span> <span class="n">v</span> <span class="o">|</span> <span class="o">|</span> <span class="o">|</span>       <span class="o">|</span>  <span class="o">|</span> <span class="n">v</span>  <span class="n">v</span> <span class="o">|</span> <span class="o">+---------++</span> <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>  <span class="o">|+-----------+-+-+-++|</span>       <span class="o">|</span> <span class="o">++-+--+-+---------+</span> <span class="o">|</span>  <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>  <span class="o">||</span>   <span class="n">COLO</span> <span class="n">Proxy</span>     <span class="o">||</span>       <span class="o">|</span> <span class="o">|</span>   <span class="n">COLO</span> <span class="n">Proxy</span>    <span class="o">|</span> <span class="o">|</span>  <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>  <span class="o">||</span> <span class="p">(</span><span class="n">compare</span> <span class="n">packet</span>  <span class="o">||</span>       <span class="o">|</span> <span class="o">|</span><span class="p">(</span><span class="n">adjust</span> <span class="n">sequence</span> <span class="o">|</span> <span class="o">|</span>  <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>  <span class="o">||</span><span class="ow">and</span> <span class="n">mirror</span> <span class="n">packet</span><span class="p">)</span><span class="o">||</span>       <span class="o">|</span> <span class="o">|</span>    <span class="ow">and</span> <span class="n">ACK</span><span class="p">)</span>     <span class="o">|</span> <span class="o">|</span>  <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">|</span>            <span class="o">|</span>  <span class="o">|</span>  <span class="o">|+------------+---+-+|</span>       <span class="o">|</span> <span class="o">+-----------------+</span> <span class="o">|</span>  <span class="o">|</span>  <span class="o">|</span>            <span class="o">|</span>
+<span class="o">+------------+</span>  <span class="o">+-----------------------+</span>       <span class="o">+------------------------+</span>  <span class="o">+------------+</span>
+<span class="o">+------------+</span>     <span class="o">|</span>             <span class="o">|</span>   <span class="o">|</span>                                <span class="o">|</span>     <span class="o">+------------+</span>
+<span class="o">|</span> <span class="n">VM</span> <span class="n">Monitor</span> <span class="o">|</span>     <span class="o">|</span>             <span class="o">|</span>   <span class="o">|</span>                                <span class="o">|</span>     <span class="o">|</span> <span class="n">VM</span> <span class="n">Monitor</span> <span class="o">|</span>
+<span class="o">+------------+</span>     <span class="o">|</span>             <span class="o">|</span>   <span class="o">|</span>                                <span class="o">|</span>     <span class="o">+------------+</span>
+<span class="o">+---------------------------------------+</span>       <span class="o">+----------------------------------------+</span>
+<span class="o">|</span>   <span class="n">Kernel</span>         <span class="o">|</span>             <span class="o">|</span>   <span class="o">|</span>  <span class="o">|</span>       <span class="o">|</span>   <span class="n">Kernel</span>            <span class="o">|</span>                  <span class="o">|</span>
+<span class="o">+---------------------------------------+</span>       <span class="o">+----------------------------------------+</span>
+                   <span class="o">|</span>             <span class="o">|</span>   <span class="o">|</span>                                <span class="o">|</span>
+    <span class="o">+--------------</span><span class="n">v</span><span class="o">+</span>  <span class="o">+---------</span><span class="n">v</span><span class="o">---+--+</span>       <span class="o">+------------------+</span> <span class="o">+</span><span class="n">v</span><span class="o">-------------+</span>
+    <span class="o">|</span>   <span class="n">Storage</span>     <span class="o">|</span>  <span class="o">|</span><span class="n">External</span> <span class="n">Network</span><span class="o">|</span>       <span class="o">|</span> <span class="n">External</span> <span class="n">Network</span> <span class="o">|</span> <span class="o">|</span>   <span class="n">Storage</span>    <span class="o">|</span>
+    <span class="o">+---------------+</span>  <span class="o">+----------------+</span>       <span class="o">+------------------+</span> <span class="o">+--------------+</span>
+</pre></div>
+</div>
+<section id="components">
+<h3>Components<a class="headerlink" href="#components" title="Link to this heading"></a></h3>
+<p>You can see there are several components in COLO’s diagram of architecture.
+Their functions are described below.</p>
+<section id="heartbeat">
+<h4>HeartBeat<a class="headerlink" href="#heartbeat" title="Link to this heading"></a></h4>
+<p>Runs on both the primary and secondary nodes, to periodically check platform
+availability. When the primary node suffers a hardware fail-stop failure,
+the heartbeat stops responding, the secondary node will trigger a failover
+as soon as it determines the absence.</p>
+</section>
+<section id="colo-disk-manager">
+<h4>COLO disk Manager<a class="headerlink" href="#colo-disk-manager" title="Link to this heading"></a></h4>
+<p>When primary VM writes data into image, the colo disk manager captures this data
+and sends it to secondary VM’s which makes sure the context of secondary VM’s
+image is consistent with the context of primary VM ‘s image.
+For more details, please refer to docs/block-replication.txt.</p>
+</section>
+<section id="checkpoint-failover-controller">
+<h4>Checkpoint/Failover Controller<a class="headerlink" href="#checkpoint-failover-controller" title="Link to this heading"></a></h4>
+<p>Modifications of save/restore flow to realize continuous migration,
+to make sure the state of VM in Secondary side is always consistent with VM in
+Primary side.</p>
+</section>
+<section id="colo-proxy">
+<h4>COLO Proxy<a class="headerlink" href="#colo-proxy" title="Link to this heading"></a></h4>
+<p>Delivers packets to Primary and Secondary, and then compare the responses from
+both side. Then decide whether to start a checkpoint according to some rules.
+Please refer to docs/colo-proxy.txt for more information.</p>
+<p>Note:
+HeartBeat has not been implemented yet, so you need to trigger failover process
+by using ‘x-colo-lost-heartbeat’ command.</p>
+</section>
+</section>
+<section id="colo-operation-status">
+<h3>COLO operation status<a class="headerlink" href="#colo-operation-status" title="Link to this heading"></a></h3>
+<p>Overview:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+-----------------+</span>
+<span class="o">|</span>                 <span class="o">|</span>
+<span class="o">|</span>    <span class="n">Start</span> <span class="n">COLO</span>   <span class="o">|</span>
+<span class="o">|</span>                 <span class="o">|</span>
+<span class="o">+--------+--------+</span>
+         <span class="o">|</span>
+         <span class="o">|</span>  <span class="n">Main</span> <span class="n">qmp</span> <span class="n">command</span><span class="p">:</span>
+         <span class="o">|</span>  <span class="n">migrate</span><span class="o">-</span><span class="nb">set</span><span class="o">-</span><span class="n">capabilities</span> <span class="k">with</span> <span class="n">x</span><span class="o">-</span><span class="n">colo</span>
+         <span class="o">|</span>  <span class="n">migrate</span>
+         <span class="o">|</span>
+         <span class="n">v</span>
+<span class="o">+--------+--------+</span>
+<span class="o">|</span>                 <span class="o">|</span>
+<span class="o">|</span>  <span class="n">COLO</span> <span class="n">running</span>   <span class="o">|</span>
+<span class="o">|</span>                 <span class="o">|</span>
+<span class="o">+--------+--------+</span>
+         <span class="o">|</span>
+         <span class="o">|</span>  <span class="n">Main</span> <span class="n">qmp</span> <span class="n">command</span><span class="p">:</span>
+         <span class="o">|</span>  <span class="n">x</span><span class="o">-</span><span class="n">colo</span><span class="o">-</span><span class="n">lost</span><span class="o">-</span><span class="n">heartbeat</span>
+         <span class="o">|</span>  <span class="ow">or</span>
+         <span class="o">|</span>  <span class="n">some</span> <span class="n">error</span> <span class="n">happened</span>
+         <span class="n">v</span>
+<span class="o">+--------+--------+</span>
+<span class="o">|</span>                 <span class="o">|</span>  <span class="n">send</span> <span class="n">qmp</span> <span class="n">event</span><span class="p">:</span>
+<span class="o">|</span>  <span class="n">COLO</span> <span class="n">failover</span>  <span class="o">|</span>  <span class="n">COLO_EXIT</span>
+<span class="o">|</span>                 <span class="o">|</span>
+<span class="o">+-----------------+</span>
+</pre></div>
+</div>
+<p>COLO use the qmp command to switch and report operation status.
+The diagram just shows the main qmp command, you can get the detail
+in test procedure.</p>
+</section>
+</section>
+<section id="test-procedure">
+<h2>Test procedure<a class="headerlink" href="#test-procedure" title="Link to this heading"></a></h2>
+<section id="setup">
+<h3>Setup<a class="headerlink" href="#setup" title="Link to this heading"></a></h3>
+<p>Here we are running both instances on the same host for testing,
+change the IP Addresses if you want to run it on two hosts. Initially
+<code class="docutils literal notranslate"><span class="pre">127.0.0.1</span></code> is the Primary Host and <code class="docutils literal notranslate"><span class="pre">127.0.0.2</span></code> is the Secondary Host.</p>
+<p>COLO uses double the guest ram size on the secondary side. The Qemu version
+should be the same on both hosts.</p>
+</section>
+<section id="startup-qemu">
+<h3>Startup qemu<a class="headerlink" href="#startup-qemu" title="Link to this heading"></a></h3>
+<p><strong>1. Primary</strong>:
+Initially, <code class="docutils literal notranslate"><span class="pre">$imagefolder/primary.qcow2</span></code> needs to be copied to all hosts.
+You don’t need to change any IP’s here, because <code class="docutils literal notranslate"><span class="pre">0.0.0.0</span></code> listens on any
+interface. The chardev’s with <code class="docutils literal notranslate"><span class="pre">127.0.0.1</span></code> IP’s loopback to the local qemu
+instance:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># imagefolder=&quot;/mnt/vms/colo-test-primary&quot;
+
+# qemu-system-x86_64 -enable-kvm -cpu qemu64,kvmclock=on -m 512 -smp 1 -qmp stdio \
+   -device piix3-usb-uhci -device usb-tablet -name primary \
+   -netdev tap,id=hn0,vhost=off,helper=/usr/lib/qemu/qemu-bridge-helper \
+   -device rtl8139,id=e0,netdev=hn0 \
+   -chardev socket,id=mirror0,host=0.0.0.0,port=9003,server=on,wait=off \
+   -chardev socket,id=compare1,host=0.0.0.0,port=9004,server=on,wait=on \
+   -chardev socket,id=compare0,host=127.0.0.1,port=9001,server=on,wait=off \
+   -chardev socket,id=compare0-0,host=127.0.0.1,port=9001 \
+   -chardev socket,id=compare_out,host=127.0.0.1,port=9005,server=on,wait=off \
+   -chardev socket,id=compare_out0,host=127.0.0.1,port=9005 \
+   -object filter-mirror,id=m0,netdev=hn0,queue=tx,outdev=mirror0 \
+   -object filter-redirector,netdev=hn0,id=redire0,queue=rx,indev=compare_out \
+   -object filter-redirector,netdev=hn0,id=redire1,queue=rx,outdev=compare0 \
+   -object iothread,id=iothread1 \
+   -object colo-compare,id=comp0,primary_in=compare0-0,secondary_in=compare1,\
+outdev=compare_out0,iothread=iothread1 \
+   -drive if=ide,id=colo-disk0,driver=quorum,read-pattern=fifo,vote-threshold=1,\
+children.0.file.filename=$imagefolder/primary.qcow2,children.0.driver=qcow2 -S
+</pre></div>
+</div>
+<p><strong>2. Secondary</strong>:
+Active and hidden images need to be created only once and the
+size should be the same as <code class="docutils literal notranslate"><span class="pre">primary.qcow2</span></code>. Again, you don’t need to change
+any IP’s here, except for the <code class="docutils literal notranslate"><span class="pre">$primary_ip</span></code> variable:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># imagefolder=&quot;/mnt/vms/colo-test-secondary&quot;
+# primary_ip=127.0.0.1
+
+# qemu-img create -f qcow2 $imagefolder/secondary-active.qcow2 10G
+
+# qemu-img create -f qcow2 $imagefolder/secondary-hidden.qcow2 10G
+
+# qemu-system-x86_64 -enable-kvm -cpu qemu64,kvmclock=on -m 512 -smp 1 -qmp stdio \
+   -device piix3-usb-uhci -device usb-tablet -name secondary \
+   -netdev tap,id=hn0,vhost=off,helper=/usr/lib/qemu/qemu-bridge-helper \
+   -device rtl8139,id=e0,netdev=hn0 \
+   -chardev socket,id=red0,host=$primary_ip,port=9003,reconnect-ms=1000 \
+   -chardev socket,id=red1,host=$primary_ip,port=9004,reconnect-ms=1000 \
+   -object filter-redirector,id=f1,netdev=hn0,queue=tx,indev=red0 \
+   -object filter-redirector,id=f2,netdev=hn0,queue=rx,outdev=red1 \
+   -object filter-rewriter,id=rew0,netdev=hn0,queue=all \
+   -drive if=none,id=parent0,file.filename=$imagefolder/primary.qcow2,driver=qcow2 \
+   -drive if=none,id=childs0,driver=replication,mode=secondary,file.driver=qcow2,\
+top-id=colo-disk0,file.file.filename=$imagefolder/secondary-active.qcow2,\
+file.backing.driver=qcow2,file.backing.file.filename=$imagefolder/secondary-hidden.qcow2,\
+file.backing.backing=parent0 \
+   -drive if=ide,id=colo-disk0,driver=quorum,read-pattern=fifo,vote-threshold=1,\
+children.0=childs0 \
+   -incoming tcp:0.0.0.0:9998
+</pre></div>
+</div>
+<p><strong>3.</strong> On Secondary VM’s QEMU monitor, issue command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span><span class="s2">&quot;qmp_capabilities&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;migrate-set-capabilities&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;capabilities&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="p">{</span><span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;return-path&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">},</span> <span class="p">{</span><span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;x-colo&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd-server-start&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;addr&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9999&quot;</span><span class="p">}</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd-server-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;parent0&quot;</span><span class="p">,</span> <span class="s2">&quot;writable&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple">
+<dt>Note:</dt><dd><ol class="loweralpha simple">
+<li><p>The qmp command <code class="docutils literal notranslate"><span class="pre">nbd-server-start</span></code> and <code class="docutils literal notranslate"><span class="pre">nbd-server-add</span></code> must be run
+before running the qmp command migrate on primary QEMU</p></li>
+<li><p>Active disk, hidden disk and nbd target’s length should be the
+same.</p></li>
+<li><p>It is better to put active disk and hidden disk in ramdisk. They
+will be merged into the parent disk on failover.</p></li>
+</ol>
+</dd>
+</dl>
+<p><strong>4.</strong> On Primary VM’s QEMU monitor, issue command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span><span class="s2">&quot;qmp_capabilities&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;blockdev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;driver&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd&quot;</span><span class="p">,</span> <span class="s2">&quot;node-name&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd0&quot;</span><span class="p">,</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.2&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9999&quot;</span><span class="p">},</span> <span class="s2">&quot;export&quot;</span><span class="p">:</span> <span class="s2">&quot;parent0&quot;</span><span class="p">,</span> <span class="s2">&quot;detect-zeroes&quot;</span><span class="p">:</span> <span class="s2">&quot;on&quot;</span><span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;x-blockdev-change&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span><span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-disk0&quot;</span><span class="p">,</span> <span class="s2">&quot;node&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;migrate-set-capabilities&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;capabilities&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="p">{</span><span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;return-path&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">},</span> <span class="p">{</span><span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;x-colo&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;migrate&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;uri&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp:127.0.0.2:9998&quot;</span> <span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+<dl class="simple">
+<dt>Note:</dt><dd><ol class="loweralpha simple">
+<li><p>There should be only one NBD Client for each primary disk.</p></li>
+<li><p>The qmp command line must be run after running qmp command line in
+secondary qemu.</p></li>
+</ol>
+</dd>
+</dl>
+<p><strong>5.</strong> After the above steps, you will see, whenever you make changes to PVM, SVM will be synced.
+You can issue command <code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">&quot;execute&quot;:</span> <span class="pre">&quot;migrate-set-parameters&quot;</span> <span class="pre">,</span> <span class="pre">&quot;arguments&quot;:{</span> <span class="pre">&quot;x-checkpoint-delay&quot;:</span> <span class="pre">2000</span> <span class="pre">}</span> <span class="pre">}</span></code>
+to change the idle checkpoint period time</p>
+</section>
+<section id="failover-test">
+<h3>Failover test<a class="headerlink" href="#failover-test" title="Link to this heading"></a></h3>
+<p>You can kill one of the VMs and Failover on the surviving VM:</p>
+<p>If you killed the Secondary, then follow “Primary Failover”.
+After that, if you want to resume the replication, follow “Primary resume replication”</p>
+<p>If you killed the Primary, then follow “Secondary Failover”.
+After that, if you want to resume the replication, follow “Secondary resume replication”</p>
+<section id="primary-failover">
+<h4>Primary Failover<a class="headerlink" href="#primary-failover" title="Link to this heading"></a></h4>
+<p>The Secondary died, resume on the Primary:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;x-blockdev-change&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-disk0&quot;</span><span class="p">,</span> <span class="s2">&quot;child&quot;</span><span class="p">:</span> <span class="s2">&quot;children.1&quot;</span><span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;blockdev-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;node-name&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd0&quot;</span><span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;comp0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;iothread1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;m0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;redire0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;redire1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;x-colo-lost-heartbeat&quot;</span> <span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="secondary-failover">
+<h4>Secondary Failover<a class="headerlink" href="#secondary-failover" title="Link to this heading"></a></h4>
+<p>The Primary died, resume on the Secondary and prepare to become the new Primary:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd-server-stop&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;x-colo-lost-heartbeat&quot;</span><span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;f2&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-del&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;f1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-remove&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;red1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-remove&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;red0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;mirror0&quot;</span><span class="p">,</span> <span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;socket&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;addr&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9003&quot;</span> <span class="p">}</span> <span class="p">},</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;compare1&quot;</span><span class="p">,</span> <span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;socket&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;addr&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9004&quot;</span> <span class="p">}</span> <span class="p">},</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;compare0&quot;</span><span class="p">,</span> <span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;socket&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;addr&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9001&quot;</span> <span class="p">}</span> <span class="p">},</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;compare0-0&quot;</span><span class="p">,</span> <span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;socket&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;addr&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9001&quot;</span> <span class="p">}</span> <span class="p">},</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="n">false</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;compare_out&quot;</span><span class="p">,</span> <span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;socket&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;addr&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9005&quot;</span> <span class="p">}</span> <span class="p">},</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;chardev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;compare_out0&quot;</span><span class="p">,</span> <span class="s2">&quot;backend&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;socket&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;addr&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9005&quot;</span> <span class="p">}</span> <span class="p">},</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="n">false</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="primary-resume-replication">
+<h4>Primary resume replication<a class="headerlink" href="#primary-resume-replication" title="Link to this heading"></a></h4>
+<p>Resume replication after new Secondary is up.</p>
+<p>Start the new Secondary (Steps 2 and 3 above), then on the Primary:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;drive-mirror&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-disk0&quot;</span><span class="p">,</span> <span class="s2">&quot;job-id&quot;</span><span class="p">:</span> <span class="s2">&quot;resync&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd://127.0.0.2:9999/parent0&quot;</span><span class="p">,</span> <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;existing&quot;</span><span class="p">,</span> <span class="s2">&quot;format&quot;</span><span class="p">:</span> <span class="s2">&quot;raw&quot;</span><span class="p">,</span> <span class="s2">&quot;sync&quot;</span><span class="p">:</span> <span class="s2">&quot;full&quot;</span><span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p>Wait until disk is synced, then:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;stop&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;block-job-cancel&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;resync&quot;</span><span class="p">}</span> <span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;blockdev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;driver&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd&quot;</span><span class="p">,</span> <span class="s2">&quot;node-name&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd0&quot;</span><span class="p">,</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.2&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9999&quot;</span><span class="p">},</span> <span class="s2">&quot;export&quot;</span><span class="p">:</span> <span class="s2">&quot;parent0&quot;</span><span class="p">,</span> <span class="s2">&quot;detect-zeroes&quot;</span><span class="p">:</span> <span class="s2">&quot;on&quot;</span><span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;x-blockdev-change&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-disk0&quot;</span><span class="p">,</span> <span class="s2">&quot;node&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;filter-mirror&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;m0&quot;</span><span class="p">,</span> <span class="s2">&quot;netdev&quot;</span><span class="p">:</span> <span class="s2">&quot;hn0&quot;</span><span class="p">,</span> <span class="s2">&quot;queue&quot;</span><span class="p">:</span> <span class="s2">&quot;tx&quot;</span><span class="p">,</span> <span class="s2">&quot;outdev&quot;</span><span class="p">:</span> <span class="s2">&quot;mirror0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;filter-redirector&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;redire0&quot;</span><span class="p">,</span> <span class="s2">&quot;netdev&quot;</span><span class="p">:</span> <span class="s2">&quot;hn0&quot;</span><span class="p">,</span> <span class="s2">&quot;queue&quot;</span><span class="p">:</span> <span class="s2">&quot;rx&quot;</span><span class="p">,</span> <span class="s2">&quot;indev&quot;</span><span class="p">:</span> <span class="s2">&quot;compare_out&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;filter-redirector&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;redire1&quot;</span><span class="p">,</span> <span class="s2">&quot;netdev&quot;</span><span class="p">:</span> <span class="s2">&quot;hn0&quot;</span><span class="p">,</span> <span class="s2">&quot;queue&quot;</span><span class="p">:</span> <span class="s2">&quot;rx&quot;</span><span class="p">,</span> <span class="s2">&quot;outdev&quot;</span><span class="p">:</span> <span class="s2">&quot;compare0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;iothread&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;iothread1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-compare&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;comp0&quot;</span><span class="p">,</span> <span class="s2">&quot;primary_in&quot;</span><span class="p">:</span> <span class="s2">&quot;compare0-0&quot;</span><span class="p">,</span> <span class="s2">&quot;secondary_in&quot;</span><span class="p">:</span> <span class="s2">&quot;compare1&quot;</span><span class="p">,</span> <span class="s2">&quot;outdev&quot;</span><span class="p">:</span> <span class="s2">&quot;compare_out0&quot;</span><span class="p">,</span> <span class="s2">&quot;iothread&quot;</span><span class="p">:</span> <span class="s2">&quot;iothread1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;migrate-set-capabilities&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;capabilities&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="p">{</span><span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;x-colo&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;migrate&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;uri&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp:127.0.0.2:9998&quot;</span> <span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p>Note:
+If this Primary previously was a Secondary, then we need to insert the
+filters before the filter-rewriter by using the
+“”insert”: “before”, “position”: “id=rew0”” Options. See below.</p>
+</section>
+<section id="secondary-resume-replication">
+<h4>Secondary resume replication<a class="headerlink" href="#secondary-resume-replication" title="Link to this heading"></a></h4>
+<p>Become Primary and resume replication after new Secondary is up. Note
+that now 127.0.0.1 is the Secondary and 127.0.0.2 is the Primary.</p>
+<p>Start the new Secondary (Steps 2 and 3 above, but with primary_ip=127.0.0.2),
+then on the old Secondary:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;drive-mirror&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-disk0&quot;</span><span class="p">,</span> <span class="s2">&quot;job-id&quot;</span><span class="p">:</span> <span class="s2">&quot;resync&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd://127.0.0.1:9999/parent0&quot;</span><span class="p">,</span> <span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;existing&quot;</span><span class="p">,</span> <span class="s2">&quot;format&quot;</span><span class="p">:</span> <span class="s2">&quot;raw&quot;</span><span class="p">,</span> <span class="s2">&quot;sync&quot;</span><span class="p">:</span> <span class="s2">&quot;full&quot;</span><span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p>Wait until disk is synced, then:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;stop&quot;</span><span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;block-job-cancel&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;resync&quot;</span> <span class="p">}</span> <span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;blockdev-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;driver&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd&quot;</span><span class="p">,</span> <span class="s2">&quot;node-name&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd0&quot;</span><span class="p">,</span> <span class="s2">&quot;server&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;inet&quot;</span><span class="p">,</span> <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;9999&quot;</span><span class="p">},</span> <span class="s2">&quot;export&quot;</span><span class="p">:</span> <span class="s2">&quot;parent0&quot;</span><span class="p">,</span> <span class="s2">&quot;detect-zeroes&quot;</span><span class="p">:</span> <span class="s2">&quot;on&quot;</span><span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;x-blockdev-change&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-disk0&quot;</span><span class="p">,</span> <span class="s2">&quot;node&quot;</span><span class="p">:</span> <span class="s2">&quot;nbd0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;filter-mirror&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;m0&quot;</span><span class="p">,</span> <span class="s2">&quot;insert&quot;</span><span class="p">:</span> <span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="s2">&quot;position&quot;</span><span class="p">:</span> <span class="s2">&quot;id=rew0&quot;</span><span class="p">,</span> <span class="s2">&quot;netdev&quot;</span><span class="p">:</span> <span class="s2">&quot;hn0&quot;</span><span class="p">,</span> <span class="s2">&quot;queue&quot;</span><span class="p">:</span> <span class="s2">&quot;tx&quot;</span><span class="p">,</span> <span class="s2">&quot;outdev&quot;</span><span class="p">:</span> <span class="s2">&quot;mirror0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;filter-redirector&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;redire0&quot;</span><span class="p">,</span> <span class="s2">&quot;insert&quot;</span><span class="p">:</span> <span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="s2">&quot;position&quot;</span><span class="p">:</span> <span class="s2">&quot;id=rew0&quot;</span><span class="p">,</span> <span class="s2">&quot;netdev&quot;</span><span class="p">:</span> <span class="s2">&quot;hn0&quot;</span><span class="p">,</span> <span class="s2">&quot;queue&quot;</span><span class="p">:</span> <span class="s2">&quot;rx&quot;</span><span class="p">,</span> <span class="s2">&quot;indev&quot;</span><span class="p">:</span> <span class="s2">&quot;compare_out&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;filter-redirector&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;redire1&quot;</span><span class="p">,</span> <span class="s2">&quot;insert&quot;</span><span class="p">:</span> <span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="s2">&quot;position&quot;</span><span class="p">:</span> <span class="s2">&quot;id=rew0&quot;</span><span class="p">,</span> <span class="s2">&quot;netdev&quot;</span><span class="p">:</span> <span class="s2">&quot;hn0&quot;</span><span class="p">,</span> <span class="s2">&quot;queue&quot;</span><span class="p">:</span> <span class="s2">&quot;rx&quot;</span><span class="p">,</span> <span class="s2">&quot;outdev&quot;</span><span class="p">:</span> <span class="s2">&quot;compare0&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;iothread&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;iothread1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;object-add&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;qom-type&quot;</span><span class="p">:</span> <span class="s2">&quot;colo-compare&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;comp0&quot;</span><span class="p">,</span> <span class="s2">&quot;primary_in&quot;</span><span class="p">:</span> <span class="s2">&quot;compare0-0&quot;</span><span class="p">,</span> <span class="s2">&quot;secondary_in&quot;</span><span class="p">:</span> <span class="s2">&quot;compare1&quot;</span><span class="p">,</span> <span class="s2">&quot;outdev&quot;</span><span class="p">:</span> <span class="s2">&quot;compare_out0&quot;</span><span class="p">,</span> <span class="s2">&quot;iothread&quot;</span><span class="p">:</span> <span class="s2">&quot;iothread1&quot;</span> <span class="p">}</span> <span class="p">}</span>
+
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;migrate-set-capabilities&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;capabilities&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="p">{</span><span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;x-colo&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="n">true</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">}</span>
+<span class="p">{</span><span class="s2">&quot;execute&quot;</span><span class="p">:</span> <span class="s2">&quot;migrate&quot;</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">:{</span> <span class="s2">&quot;uri&quot;</span><span class="p">:</span> <span class="s2">&quot;tcp:127.0.0.1:9998&quot;</span> <span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+<div class="line-block">
+<div class="line">Copyright (c) 2016 Intel Corporation</div>
+<div class="line">Copyright (c) 2016 HUAWEI TECHNOLOGIES CO., LTD.</div>
+<div class="line">Copyright (c) 2016 Fujitsu, Corp.</div>
+<div class="line">Copyright (c) 2026 Lukas Straub &lt;<a class="reference external" href="mailto:lukasstraub2&#37;&#52;&#48;web&#46;de">lukasstraub2<span>&#64;</span>web<span>&#46;</span>de</a>&gt;</div>
+</div>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sriov.html" class="btn btn-neutral float-left" title="Composable SR-IOV device" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../user/index.html" class="btn btn-neutral float-right" title="User Mode Emulation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, The QEMU Project Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+
+<!-- Empty para to force a blank line after "Built with Sphinx ..." -->
+<p></p>
+
+<p>This documentation is for QEMU version 11.0.50.</p>
+
+
+<p><a href="../about/license.html">QEMU and this manual are released under the
+GNU General Public License, version 2.</a></p>
+
+ 
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

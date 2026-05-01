@@ -1,0 +1,44 @@
+Smart Link DSP library — redistribution notice
+==============================================
+
+The file vm/slmodemd/dsplibs.o is a proprietary closed-source object
+file from Smart Link Ltd. that implements the modem data pumps used
+by slmodemd. It contains no synthmodem code; we redistribute it
+unmodified as part of the vendored slmodemd tree.
+
+Origin
+------
+dsplibs.o is distributed with Smart Link's free "Soft Modem" binary
+release, which Smart Link authorized to be included in the Debian
+sl-modem-daemon source package under the following terms:
+
+  "Smart Link hereby grants permission to free-redistribute this
+   binary [dsplibs.o] as part of the sl-modem-daemon package."
+
+The file we ship was sourced from the synexo/D-Modem upstream at
+commit 902c79aa36fa094c7513fa911b64f4fa8a0bf614, which in turn
+obtained it from the same Debian package distribution chain.
+
+Redistribution obligations
+--------------------------
+1. This file (licenses/DSPLIBS-NOTICE) must accompany every
+   redistribution that includes dsplibs.o.
+2. dsplibs.o is redistributed unmodified and with no claim of
+   ownership by the synthmodem project.
+3. This notice and the accompanying dsplibs.o must be kept together
+   in any binary bundle.
+
+Limitations we accept
+---------------------
+- No source is available, so we cannot rebuild it, patch bugs in it,
+  or port it to architectures other than 32-bit i386.
+- dsplibs.o is used only when the slmodemd-pjsip backend is selected
+  (config.modem.backend = 'slmodemd-pjsip'), which runs slmodemd
+  inside the runtime VM driven by d-modem. The default 'native'
+  backend does not link against it.
+
+If the redistribution terms for dsplibs.o change in the future (or
+are challenged), the slmodemd-pjsip backend can be disabled by
+excluding dsplibs.o and shipping only the native backend. The
+synthmodem codebase itself does not depend on dsplibs.o at build
+time.

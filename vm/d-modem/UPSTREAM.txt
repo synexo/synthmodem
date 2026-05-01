@@ -1,0 +1,37 @@
+# Upstream pin for vm/d-modem/
+#
+# This directory is a vendored snapshot of the d-modem.c glue file from
+# the D-Modem project. d-modem.c is the PJSIP media-port subclass that
+# bridges a PJSIP call to slmodemd's socketpair; it is the integration
+# layer the slmodemd-pjsip backend relies on.
+#
+# We do NOT fork d-modem.c: when upstream releases changes, re-run
+# scripts/fetch-d-modem.sh (or copy d-modem.c verbatim from a fresh
+# clone), update the commit hash and file SHA256 below, and rebuild.
+#
+# The d-modem.c source is GPLv2-or-later; see licenses/D-MODEM-NOTICE
+# and the copyright header inside d-modem.c itself.
+#
+# See IMPLEMENTATION.md and COPYING for the policy.
+
+upstream-repo:   https://github.com/synexo/D-Modem
+upstream-path:   d-modem.c
+upstream-commit: 902c79aa36fa094c7513fa911b64f4fa8a0bf614
+vendored-at:     2026-04-23
+file-sha256:     c2e76759d9529bf467a918e128c5b3e15b4eaff0077d32bdc896a54e36a478a1
+
+# Redistribution notes:
+#   - d-modem.c carries "Copyright (C) 2021 Aon plc" with GPLv2-or-later
+#     license grant in its header. The header is preserved verbatim.
+#   - PJSIP itself is NOT vendored here; its source tarball lives in
+#     vm/sources/pjproject-2.15.1.tar.gz and is consumed at build time
+#     by the bookworm build VM (see scripts/build-vm-binaries.sh).
+#   - The D-Modem upstream also bundles pjproject-2.15.1/ inside its
+#     repository. We verified at vendor time that every file in that
+#     bundled subtree is byte-identical to the upstream pjsip/pjproject
+#     release tag 2.15.1. We therefore vendor PJSIP directly from
+#     upstream rather than from the D-Modem subtree, which is a clean-
+#     provenance choice. If a future D-Modem branch ever patches PJSIP
+#     itself, that decision needs to be revisited: either switch to
+#     vendoring from the D-Modem subtree, or carry the patches as a
+#     separate patch series under vm/pjsip/patches/.

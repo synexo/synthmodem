@@ -1,0 +1,212 @@
+#!/bin/sh
+#
+# /etc/init.d/S99modem-pjsip — start slmodemd + d-modem + helpers
+# for backend B (slmodemd-pjsip).
+#
+# Init flow (driven by /etc/inittab):
+#   1. ::sysinit:/etc/init.d/rcS mounts /proc, /sys, /dev, /dev/pts, /tmp.
+#   2. ttyS0::respawn:/etc/init.d/S99modem-pjsip (this script) runs on the
+#      serial console, so slmodemd's stdout/stderr lands where QEMU
+#      captures it and the Node runner can read boot diagnostics.
+#
+# Backend B's in-VM topology:
+#
+#     Node host (PjsipBackend)
+#        │                  │
+#        │ UdpTcpTunnel     │ wire proto
+#        │ over virtio      │ over virtio
+#        │                  │
+#   ┌────▼──────────┐  ┌────▼────────┐
+#   │ modemd-tunnel │  │ modemd-ctrl │       this VM
+#   └──┬────────────┘  └─────┬───────┘
+#      │ UDP                 │ PTY reads/writes
+#      │                     │
+#   ┌──▼──────────┐    ┌─────▼───────┐
+#   │ d-modem     │    │ slmodemd    │
+#   │ (PJSIP, -e) ├────► (DSP, PTY)  │
+#   └─────────────┘ fd └─────────────┘
+#                  pair
+#
+#   Node drives INVITE → modemd-tunnel → d-modem (PJSIP UAS inside VM)
+#   Node drives ATA via modemd-ctrl → PTY → slmodemd → "MA" to d-modem
+#                 → d-modem answers, RTP flows, slmodemd DSP runs
+#
+# What this script does:
+#   a. Load virtio kernel modules, create /dev/virtio-ports/<n> symlinks
+#      (same boilerplate as backend A's S99modem).
+#   b. Bring up loopback (required — PJSIP binds 127.0.0.1).
+#   c. Start modemd-tunnel in the background (talks to the tunnel
+#      chardev). Its audio / SIP / RTP UDP sockets are where d-modem's
+#      PJSIP sends its traffic.
+#   d. Start modemd-ctrl in the background (talks to the control
+#      chardev). PTY will be populated once slmodemd creates it.
+#   e. Exec slmodemd with -e pointing at d-modem. slmodemd creates
+#      /tmp/ttySL0, fork-execs d-modem with the slmodemd audio/sip
+#      sockets, and waits for AT commands on the PTY.
+
+set -e
+
+TUNNEL_BIN=/usr/local/bin/modemd-tunnel
+CTRL_BIN=/usr/local/bin/modemd-ctrl
+SLMODEMD=/usr/local/bin/slmodemd
+DMODEM=/usr/local/bin/d-modem
+
+# Virtio chardev device paths. The host (PjsipBackend) wires both.
+TUNNEL_DEV=/dev/virtio-ports/synthmodem.tunnel
+CONTROL_DEV=/dev/virtio-ports/synthmodem.control
+
+# slmodemd creates its PTY as /tmp/ttySL<N> when non-root (as uid 100),
+# /dev/ttySL<N> when root. We match backend A: run as uid 100, PTY at
+# /tmp/ttySL0. This is the path modemd-ctrl opens for AT/data bridging.
+PTY_LINK=/tmp/ttySL0
+
+start() {
+    # rcS mounted /proc /sys /dev /dev/pts /tmp already; these lines
+    # are idempotent safety nets in case this script is run by hand.
+    mount -t proc     proc     /proc     2>/dev/null || true
+    mount -t sysfs    sysfs    /sys      2>/dev/null || true
+    mount -t devtmpfs devtmpfs /dev      2>/dev/null || true
+    mkdir -p /dev/pts
+    mount -t devpts   devpts   /dev/pts  2>/dev/null || true
+
+    # PJSIP inside d-modem binds 127.0.0.1. Without lo up, sendto()
+    # returns ENETUNREACH. Backend A didn't need this (slmodemd uses
+    # socketpairs, not IP) — it's new for backend B.
+    ip link set lo up 2>/dev/null || ifconfig lo up 2>/dev/null || true
+
+    # Load virtio modules. Same ordering as backend A's S99modem.
+    MOD_DIR=/lib/modules/virtio
+    for m in virtio virtio_ring virtio_pci_legacy_dev virtio_pci_modern_dev \
+             virtio_pci virtio_console; do
+        if [ -f "$MOD_DIR/$m.ko" ]; then
+            insmod "$MOD_DIR/$m.ko" 2>/dev/null || true
+        else
+            echo "S99modem-pjsip: warning: $MOD_DIR/$m.ko not found" >&2
+        fi
+    done
+
+    # Wait for /sys/class/virtio-ports to be populated (up to ~5s).
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 \
+             21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 \
+             38 39 40 41 42 43 44 45 46 47 48 49 50; do
+        if [ -d /sys/class/virtio-ports ] && \
+           ls /sys/class/virtio-ports/vport*/name >/dev/null 2>&1; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    # Create /dev/virtio-ports/<n> symlinks (no udev/mdev).
+    mkdir -p /dev/virtio-ports
+    for dir in /sys/class/virtio-ports/vport*; do
+        [ -d "$dir" ] || continue
+        base=$(basename "$dir")
+        if [ -r "$dir/name" ]; then
+            pname=$(cat "$dir/name" 2>/dev/null)
+            if [ -n "$pname" ] && [ -c "/dev/$base" ]; then
+                ln -sf "/dev/$base" "/dev/virtio-ports/$pname"
+                chmod 0666 "/dev/$base"
+            fi
+        fi
+    done
+
+    if [ ! -c "$TUNNEL_DEV" ] || [ ! -c "$CONTROL_DEV" ]; then
+        echo "S99modem-pjsip: virtio-serial devices not found" >&2
+        echo "  TUNNEL_DEV=$TUNNEL_DEV $([ -c $TUNNEL_DEV ] && echo exists || echo missing)" >&2
+        echo "  CONTROL_DEV=$CONTROL_DEV $([ -c $CONTROL_DEV ] && echo exists || echo missing)" >&2
+        exit 1
+    fi
+
+    echo "S99modem-pjsip: starting backend B"
+    echo "  TUNNEL_DEV=$TUNNEL_DEV"
+    echo "  CONTROL_DEV=$CONTROL_DEV"
+    echo "  PTY_LINK=$PTY_LINK"
+
+    # Pick up synthmodem_log from kernel cmdline if present.
+    KCMDLINE_LOG=$(cat /proc/cmdline 2>/dev/null | tr ' ' '\n' \
+                   | grep '^synthmodem_log=' | head -1 \
+                   | sed 's/^synthmodem_log=//')
+    LOG_LEVEL="${KCMDLINE_LOG:-info}"
+    echo "  LOG_LEVEL=$LOG_LEVEL"
+
+    # Start modemd-tunnel in the background. Points at the tunnel
+    # chardev; binds ephemeral UDP; d-modem's PJSIP hits 127.0.0.1:5060/
+    # :10000/:10001 which are the tunnel's target peer ports.
+    SYNTHMODEM_LOG_LEVEL="$LOG_LEVEL" \
+      SYNTHMODEM_TUNNEL_PATH="$TUNNEL_DEV" \
+      "$TUNNEL_BIN" &
+    TUNNEL_PID=$!
+    echo "  modemd-tunnel started pid=$TUNNEL_PID"
+
+    # Start modemd-ctrl in the background, pointing at the control
+    # chardev. It will wait (with retries) for the PTY to appear at
+    # $PTY_LINK — slmodemd creates that when it starts below. The
+    # retry/backoff in open_host_path handles the startup race.
+    #
+    # Run modemd-ctrl as uid 100 (same as slmodemd below). This
+    # matters because slmodemd creates /tmp/ttySL0 as a symlink to
+    # /dev/pts/<N>, where the slave node is owned by whoever opened
+    # /dev/ptmx (i.e. uid 100). If we run modemd-ctrl as root, stat()
+    # following the symlink returns EACCES on some kernels because
+    # devpts's /dev/pts/ dir enforces owner search permissions for
+    # root unexpectedly. Running as the PTY owner makes access
+    # straightforward. Since /dev/virtio-ports/* is chmod'd 0666
+    # above, uid 100 can also read/write the control chardev.
+    su -s /bin/sh slmodemd -c \
+      "SYNTHMODEM_LOG_LEVEL='$LOG_LEVEL' \
+       SYNTHMODEM_CONTROL_PATH='$CONTROL_DEV' \
+       SYNTHMODEM_PTY_PATH='$PTY_LINK' \
+       SYNTHMODEM_BUILD_ID='pjsip-vm' \
+       exec '$CTRL_BIN'" &
+    CTRL_PID=$!
+    echo "  modemd-ctrl started pid=$CTRL_PID (as slmodemd)"
+
+    # Exec slmodemd with -e pointing at d-modem. slmodemd forks d-modem
+    # on call start, passing audio and sip-info socketpair fds as argv.
+    # d-modem owns the PJSIP media plane for this call; slmodemd still
+    # owns the DSP and the PTY.
+    #
+    # Run as uid 100 (user 'slmodemd') to sidestep slmodemd's drop-
+    # privs code path when started as root. Same reasoning as backend A.
+    # Results in PTY at /tmp/ttySL0 (uid 100's /tmp).
+    #
+    # -S/-U/-P pass through as --sip-server/--sip-user/--sip-password
+    # to d-modem at fork-exec time. Having credentials is what keeps
+    # d-modem alive past its empty-dialstr check (d-modem.c line 724):
+    # with credentials it sets direct_call=0, skips the exit, and
+    # proceeds to pjsua_init + pjsua_acc_add with register_on_acc_add=
+    # true. PJSIP then sends REGISTER to 127.0.0.1:5060 where modemd-
+    # tunnel is bound; the tunnel forwards the REGISTER over the
+    # virtio-serial chardev to Node's VmRegistrar, which 200-OKs.
+    # From that moment on, Node has d-modem's learned Contact (its
+    # ephemeral PJSIP port) and can INVITE directly.
+    #
+    # The values "modem" / "x" are placeholders; our registrar accepts
+    # any credentials (no digest challenge). Server is 127.0.0.1:5060
+    # which is strictly local loopback inside the VM.
+    #
+    # -d2 gives startup debug info; 2>&1 routes to serial console.
+    exec su -s /bin/sh slmodemd -c \
+      "exec \"$SLMODEMD\" -d2 \
+        -S 127.0.0.1:5060 -U modem -P x \
+        -e \"$DMODEM\" 2>&1"
+}
+
+stop() {
+    if command -v killall >/dev/null 2>&1; then
+        killall slmodemd modemd-tunnel modemd-ctrl 2>/dev/null || true
+    else
+        for pid in $(pidof slmodemd 2>/dev/null) \
+                   $(pidof modemd-tunnel 2>/dev/null) \
+                   $(pidof modemd-ctrl 2>/dev/null); do
+            kill "$pid" 2>/dev/null || true
+        done
+    fi
+}
+
+case "$1" in
+    start|'')  start ;;
+    stop)      stop ;;
+    restart)   stop; sleep 1; start ;;
+    *)         echo "Usage: $0 {start|stop|restart}" >&2; exit 64 ;;
+esac

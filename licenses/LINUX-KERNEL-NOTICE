@@ -1,0 +1,71 @@
+Linux kernel
+============
+
+The Linux kernel provides the operating system for the runtime
+VM. synthmodem redistributes a compiled kernel image and a
+selection of loadable modules at:
+
+  vm/kernel/bzImage
+  vm/kernel/modules/
+
+These are taken from the Debian bookworm binary package
+`linux-image-6.1.0-42-686-pae-unsigned` (Debian source package
+`linux` version 6.1.159-1, i386). The kernel and its modules
+are used only when the slmodemd-pjsip backend is active (or
+during the slmodemd-pjsip phase of the auto backend) and run
+inside QEMU; the native backend runs entirely on the host
+Node.js runtime and does not load them.
+
+Upstream project:  https://kernel.org/
+Upstream source:   https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+Debian package:    https://packages.debian.org/bookworm/linux-image-686-pae
+
+License
+-------
+
+The Linux kernel is licensed under the GNU General Public
+License, version 2 only (GPL-2.0-only), with an explicit
+exception for the user-space syscall interface known as
+"Linux-syscall-note". The kernel's own COPYING file states the
+SPDX identifier as:
+
+  GPL-2.0 WITH Linux-syscall-note
+
+The "or later" option of the GPL does NOT apply to the kernel.
+The complete GPL-2.0 text is at `licenses/GPL-2.0.txt`. The
+Linux-syscall-note exception text is preserved in the upstream
+source tree at `LICENSES/exceptions/Linux-syscall-note` inside
+`vm/sources/linux_6.1.159.orig.tar.xz`.
+
+Individual kernel source files carry their own SPDX identifiers
+and copyright headers; those headers are preserved verbatim in
+the vendored source tarball.
+
+Corresponding source
+--------------------
+
+GPL-2.0 §3(a) requires that the kernel binaries redistributed in
+`vm/kernel/` travel with their complete corresponding source.
+That obligation is satisfied by committing the upstream Debian
+source set to this repository at:
+
+  vm/sources/linux_6.1.159.orig.tar.xz   (split: .partaa + .partab)
+  vm/sources/linux_6.1.159-1.debian.tar.xz
+  vm/sources/linux_6.1.159-1.dsc
+
+The upstream tarball is split into two parts because GitHub's
+100 MB per-file limit is below the kernel tarball's 131 MB size;
+see `vm/sources/README.md` for the maintainer-side handling
+strategy and the reassembly procedure. SHA256 sums for all parts
+are pinned in `vm/sources/SHA256SUMS`. The top-level `COPYING`
+enumerates these paths in its GPL corresponding-source statement.
+
+Modifications from upstream
+---------------------------
+
+None. synthmodem redistributes the unmodified Debian binary
+package contents (kernel image plus the subset of modules
+required by the runtime VM, primarily virtio drivers). If
+synthmodem ever ships a patched kernel, this notice must be
+updated to record the nature of the modifications, per GPL-2.0
+§2(a).

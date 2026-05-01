@@ -1,0 +1,376 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QED Image File Format Specification &mdash; QEMU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=f5127f15" />
+      <link rel="stylesheet" type="text/css" href="../_static/theme_overrides.css?v=b3ae9cc8" />
+
+  
+    <link rel="shortcut icon" href="../_static/qemu_32x32.png"/>
+      <script src="../_static/jquery.js?v=8dae8fb0"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=3b5cce75"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/custom.js?v=2ab9f71d"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Persistent reservation helper protocol" href="pr-helper.html" />
+    <link rel="prev" title="Qcow2 Image File Format" href="qcow2.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #802400" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QEMU
+              <img src="../_static/qemu_128x128.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about/index.html">About QEMU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../system/index.html">System Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/index.html">User Mode Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">Tools</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">System Emulation Management and Interoperability</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="barrier.html">Barrier client protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bitmaps.html">Dirty Bitmaps and Incremental Backup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dbus.html">D-Bus</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dbus-vmstate.html">D-Bus VMState</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dbus-display.html">D-Bus display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="live-block-operations.html">Live Block Device Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nbd.html">QEMU NBD protocol support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parallels.html">Parallels Expandable Image File Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="prl-xml.html">Parallels Disk Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qcow2.html">Qcow2 Image File Format</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">QED Image File Format Specification</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#header">Header</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#field-descriptions">Field descriptions:</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#feature-bits">Feature bits:</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#tables">Tables</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#l2-table-offsets">L2 table offsets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#data-cluster-offsets">Data cluster offsets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#unallocated-l2-tables-and-data-clusters">Unallocated L2 tables and data clusters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#zero-data-clusters">Zero data clusters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#logical-offset-translation">Logical offset translation</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#consistency-checking">Consistency checking</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pr-helper.html">Persistent reservation helper protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qmp-spec.html">QEMU Machine Protocol Specification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-ga.html">QEMU Guest Agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-ga-ref.html">QEMU Guest Agent Protocol Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-qmp-ref.html">QEMU QMP Reference Manual</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qemu-storage-daemon-qmp-ref.html">QEMU Storage Daemon QMP Reference Manual</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vfio-user.html">vfio-user Protocol Specification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost-user.html">Vhost-user Protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost-user-gpu.html">Vhost-user-gpu Protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost-vdpa.html">Vhost-vdpa Protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio-balloon-stats.html">Virtio balloon memory statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vnc-ledstate-pseudo-encoding.html">VNC LED state Pseudo-encoding</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../specs/index.html">System Emulation Guest Hardware Specifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../devel/index.html">Developer Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #802400" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QEMU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">System Emulation Management and Interoperability</a></li>
+      <li class="breadcrumb-item active">QED Image File Format Specification</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="https://gitlab.com/qemu-project/qemu/-/blob/master/docs/interop/qed_spec.rst">View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="qed-image-file-format-specification">
+<h1>QED Image File Format Specification<a class="headerlink" href="#qed-image-file-format-specification" title="Link to this heading"></a></h1>
+<p>The file format looks like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+----------+----------+----------+-----+</span>
+<span class="o">|</span> <span class="n">cluster0</span> <span class="o">|</span> <span class="n">cluster1</span> <span class="o">|</span> <span class="n">cluster2</span> <span class="o">|</span> <span class="o">...</span> <span class="o">|</span>
+<span class="o">+----------+----------+----------+-----+</span>
+</pre></div>
+</div>
+<p>The first cluster begins with the <code class="docutils literal notranslate"><span class="pre">header</span></code>. The header contains information
+about where regular clusters start; this allows the header to be extensible and
+store extra information about the image file. A regular cluster may be
+a <code class="docutils literal notranslate"><span class="pre">data</span> <span class="pre">cluster</span></code>, an <code class="docutils literal notranslate"><span class="pre">L2</span></code>, or an <code class="docutils literal notranslate"><span class="pre">L1</span> <span class="pre">table</span></code>. L1 and L2 tables are composed
+of one or more contiguous clusters.</p>
+<p>Normally the file size will be a multiple of the cluster size.  If the file size
+is not a multiple, extra information after the last cluster may not be preserved
+if data is written. Legitimate extra information should use space between the header
+and the first regular cluster.</p>
+<p>All fields are little-endian.</p>
+<section id="header">
+<h2>Header<a class="headerlink" href="#header" title="Link to this heading"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Header</span> <span class="p">{</span>
+   <span class="n">uint32_t</span> <span class="n">magic</span><span class="p">;</span>               <span class="o">/*</span> <span class="n">QED</span>\<span class="mi">0</span> <span class="o">*/</span>
+
+   <span class="n">uint32_t</span> <span class="n">cluster_size</span><span class="p">;</span>        <span class="o">/*</span> <span class="ow">in</span> <span class="nb">bytes</span> <span class="o">*/</span>
+   <span class="n">uint32_t</span> <span class="n">table_size</span><span class="p">;</span>          <span class="o">/*</span> <span class="k">for</span> <span class="n">L1</span> <span class="ow">and</span> <span class="n">L2</span> <span class="n">tables</span><span class="p">,</span> <span class="ow">in</span> <span class="n">clusters</span> <span class="o">*/</span>
+   <span class="n">uint32_t</span> <span class="n">header_size</span><span class="p">;</span>         <span class="o">/*</span> <span class="ow">in</span> <span class="n">clusters</span> <span class="o">*/</span>
+
+   <span class="n">uint64_t</span> <span class="n">features</span><span class="p">;</span>            <span class="o">/*</span> <span class="nb">format</span> <span class="n">feature</span> <span class="n">bits</span> <span class="o">*/</span>
+   <span class="n">uint64_t</span> <span class="n">compat_features</span><span class="p">;</span>     <span class="o">/*</span> <span class="n">compat</span> <span class="n">feature</span> <span class="n">bits</span> <span class="o">*/</span>
+   <span class="n">uint64_t</span> <span class="n">autoclear_features</span><span class="p">;</span>  <span class="o">/*</span> <span class="bp">self</span><span class="o">-</span><span class="n">resetting</span> <span class="n">feature</span> <span class="n">bits</span> <span class="o">*/</span>
+
+   <span class="n">uint64_t</span> <span class="n">l1_table_offset</span><span class="p">;</span>     <span class="o">/*</span> <span class="ow">in</span> <span class="nb">bytes</span> <span class="o">*/</span>
+   <span class="n">uint64_t</span> <span class="n">image_size</span><span class="p">;</span>          <span class="o">/*</span> <span class="n">total</span> <span class="n">logical</span> <span class="n">image</span> <span class="n">size</span><span class="p">,</span> <span class="ow">in</span> <span class="nb">bytes</span> <span class="o">*/</span>
+
+   <span class="o">/*</span> <span class="k">if</span> <span class="p">(</span><span class="n">features</span> <span class="o">&amp;</span> <span class="n">QED_F_BACKING_FILE</span><span class="p">)</span> <span class="o">*/</span>
+   <span class="n">uint32_t</span> <span class="n">backing_filename_offset</span><span class="p">;</span> <span class="o">/*</span> <span class="ow">in</span> <span class="nb">bytes</span> <span class="kn">from</span> <span class="nn">start</span> <span class="n">of</span> <span class="n">header</span> <span class="o">*/</span>
+   <span class="n">uint32_t</span> <span class="n">backing_filename_size</span><span class="p">;</span>   <span class="o">/*</span> <span class="ow">in</span> <span class="nb">bytes</span> <span class="o">*/</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<section id="field-descriptions">
+<h3>Field descriptions:<a class="headerlink" href="#field-descriptions" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cluster_size</span></code> must be a power of 2 in range [2^12, 2^26].</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">table_size</span></code> must be a power of 2 in range [1, 16].</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">header_size</span></code> is the number of clusters used by the header and any additional
+information stored before regular clusters.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">features</span></code>, <code class="docutils literal notranslate"><span class="pre">compat_features</span></code>, and <code class="docutils literal notranslate"><span class="pre">autoclear_features</span></code> are file format
+extension bitmaps. They work as follows:</p>
+<ul>
+<li><p>An image with unknown <code class="docutils literal notranslate"><span class="pre">features</span></code> bits enabled must not be opened. File format
+changes that are not backwards-compatible must use <code class="docutils literal notranslate"><span class="pre">features</span></code> bits.</p></li>
+<li><p>An image with unknown <code class="docutils literal notranslate"><span class="pre">compat_features</span></code> bits enabled can be opened safely.
+The unknown features are simply ignored and represent backwards-compatible
+changes to the file format.</p></li>
+<li><p>An image with unknown <code class="docutils literal notranslate"><span class="pre">autoclear_features</span></code> bits enable can be opened safely
+after clearing the unknown bits. This allows for backwards-compatible changes
+to the file format which degrade gracefully and can be re-enabled again by a
+new program later.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">l1_table_offset</span></code> is the offset of the first byte of the L1 table in the image
+file and must be a multiple of <code class="docutils literal notranslate"><span class="pre">cluster_size</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">image_size</span></code> is the block device size seen by the guest and must be a multiple
+of 512 bytes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">backing_filename_offset</span></code> and <code class="docutils literal notranslate"><span class="pre">backing_filename_size</span></code> describe a string in
+(byte offset, byte size) form. It is not NUL-terminated and has no alignment constraints.
+The string must be stored within the first <code class="docutils literal notranslate"><span class="pre">header_size</span></code> clusters. The backing filename
+may be an absolute path or relative to the image file.</p></li>
+</ul>
+</section>
+<section id="feature-bits">
+<h3>Feature bits:<a class="headerlink" href="#feature-bits" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">QED_F_BACKING_FILE</span> <span class="pre">=</span> <span class="pre">0x01</span></code>. The image uses a backing file.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">QED_F_NEED_CHECK</span> <span class="pre">=</span> <span class="pre">0x02</span></code>. The image needs a consistency check before use.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">QED_F_BACKING_FORMAT_NO_PROBE</span> <span class="pre">=</span> <span class="pre">0x04</span></code>. The backing file is a raw disk image
+and no file format autodetection should be attempted.  This should be used to
+ensure that raw backing files are never detected as an image format if they happen
+to contain magic constants.</p></li>
+</ul>
+<p>There are currently no defined <code class="docutils literal notranslate"><span class="pre">compat_features</span></code> or <code class="docutils literal notranslate"><span class="pre">autoclear_features</span></code> bits.</p>
+<p>Fields predicated on a feature bit are only used when that feature is set.
+The fields always take up header space, regardless of whether or not the feature
+bit is set.</p>
+</section>
+</section>
+<section id="tables">
+<h2>Tables<a class="headerlink" href="#tables" title="Link to this heading"></a></h2>
+<p>Tables provide the translation from logical offsets in the block device to cluster
+offsets in the file.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#define TABLE_NOFFSETS (table_size * cluster_size / sizeof(uint64_t))</span>
+
+<span class="n">Table</span> <span class="p">{</span>
+    <span class="n">uint64_t</span> <span class="n">offsets</span><span class="p">[</span><span class="n">TABLE_NOFFSETS</span><span class="p">];</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The tables are organized as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>                   <span class="o">+----------+</span>
+                   <span class="o">|</span> <span class="n">L1</span> <span class="n">table</span> <span class="o">|</span>
+                   <span class="o">+----------+</span>
+              <span class="p">,</span><span class="o">------</span><span class="s1">&#39;  |  &#39;</span><span class="o">------.</span>
+         <span class="o">+----------+</span>   <span class="o">|</span>    <span class="o">+----------+</span>
+         <span class="o">|</span> <span class="n">L2</span> <span class="n">table</span> <span class="o">|</span>  <span class="o">...</span>   <span class="o">|</span> <span class="n">L2</span> <span class="n">table</span> <span class="o">|</span>
+         <span class="o">+----------+</span>        <span class="o">+----------+</span>
+     <span class="p">,</span><span class="o">------</span><span class="s1">&#39;  |  &#39;</span><span class="o">------.</span>
+<span class="o">+----------+</span>   <span class="o">|</span>    <span class="o">+----------+</span>
+<span class="o">|</span>   <span class="n">Data</span>   <span class="o">|</span>  <span class="o">...</span>   <span class="o">|</span>   <span class="n">Data</span>   <span class="o">|</span>
+<span class="o">+----------+</span>        <span class="o">+----------+</span>
+</pre></div>
+</div>
+<p>A table is made up of one or more contiguous clusters.  The <code class="docutils literal notranslate"><span class="pre">table_size</span></code> header
+field determines table size for an image file. For example, <code class="docutils literal notranslate"><span class="pre">cluster_size=64</span> <span class="pre">KB</span></code>
+and <code class="docutils literal notranslate"><span class="pre">table_size=4</span></code> results in 256 KB tables.</p>
+<p>The logical image size must be less than or equal to the maximum possible size of
+clusters rooted by the L1 table:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">header</span><span class="o">.</span><span class="n">image_size</span> <span class="o">&lt;=</span> <span class="n">TABLE_NOFFSETS</span> <span class="o">*</span> <span class="n">TABLE_NOFFSETS</span> <span class="o">*</span> <span class="n">header</span><span class="o">.</span><span class="n">cluster_size</span>
+</pre></div>
+</div>
+<p>L1, L2, and data cluster offsets must be aligned to <code class="docutils literal notranslate"><span class="pre">header.cluster_size</span></code>.
+The following offsets have special meanings:</p>
+<section id="l2-table-offsets">
+<h3>L2 table offsets<a class="headerlink" href="#l2-table-offsets" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>0 - unallocated. The L2 table is not yet allocated.</p></li>
+</ul>
+</section>
+<section id="data-cluster-offsets">
+<h3>Data cluster offsets<a class="headerlink" href="#data-cluster-offsets" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>0 - unallocated.  The data cluster is not yet allocated.</p></li>
+<li><p>1 - zero. The data cluster contents are all zeroes and no cluster is allocated.</p></li>
+</ul>
+<p>Future format extensions may wish to store per-offset information. The least
+significant 12 bits of an offset are reserved for this purpose and must be set
+to zero. Image files with <code class="docutils literal notranslate"><span class="pre">cluster_size</span></code> &gt; 2^12 will have more unused bits
+which should also be zeroed.</p>
+</section>
+<section id="unallocated-l2-tables-and-data-clusters">
+<h3>Unallocated L2 tables and data clusters<a class="headerlink" href="#unallocated-l2-tables-and-data-clusters" title="Link to this heading"></a></h3>
+<p>Reads to an unallocated area of the image file access the backing file. If there
+is no backing file, then zeroes are produced. The backing file may be smaller
+than the image file and reads of unallocated areas beyond the end of the backing
+file produce zeroes.</p>
+<p>Writes to an unallocated area cause a new data clusters to be allocated, and a new
+L2 table if that is also unallocated. The new data cluster is populated with data
+from the backing file (or zeroes if no backing file) and the data being written.</p>
+</section>
+<section id="zero-data-clusters">
+<h3>Zero data clusters<a class="headerlink" href="#zero-data-clusters" title="Link to this heading"></a></h3>
+<p>Zero data clusters are a space-efficient way of storing zeroed regions of the image.</p>
+<p>Reads to a zero data cluster produce zeroes.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The difference between an unallocated and a zero data cluster is that zero data
+clusters stop the reading of contents from the backing file.</p>
+</div>
+<p>Writes to a zero data cluster cause a new data cluster to be allocated.  The new
+data cluster is populated with zeroes and the data being written.</p>
+</section>
+<section id="logical-offset-translation">
+<h3>Logical offset translation<a class="headerlink" href="#logical-offset-translation" title="Link to this heading"></a></h3>
+<p>Logical offsets are translated into cluster offsets as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">table_bits</span> <span class="n">table_bits</span>    <span class="n">cluster_bits</span>
+ <span class="o">&lt;--------&gt;</span> <span class="o">&lt;--------&gt;</span> <span class="o">&lt;---------------&gt;</span>
+<span class="o">+----------+----------+-----------------+</span>
+<span class="o">|</span> <span class="n">L1</span> <span class="n">index</span> <span class="o">|</span> <span class="n">L2</span> <span class="n">index</span> <span class="o">|</span>     <span class="n">byte</span> <span class="n">offset</span> <span class="o">|</span>
+<span class="o">+----------+----------+-----------------+</span>
+
+      <span class="n">Structure</span> <span class="n">of</span> <span class="n">a</span> <span class="n">logical</span> <span class="n">offset</span>
+
+<span class="n">offset_mask</span> <span class="o">=</span> <span class="o">~</span><span class="p">(</span><span class="n">cluster_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="c1"># mask for the image file byte offset</span>
+
+<span class="k">def</span> <span class="nf">logical_to_cluster_offset</span><span class="p">(</span><span class="n">l1_index</span><span class="p">,</span> <span class="n">l2_index</span><span class="p">,</span> <span class="n">byte_offset</span><span class="p">):</span>
+  <span class="n">l2_offset</span> <span class="o">=</span> <span class="n">l1_table</span><span class="p">[</span><span class="n">l1_index</span><span class="p">]</span>
+  <span class="n">l2_table</span> <span class="o">=</span> <span class="n">load_table</span><span class="p">(</span><span class="n">l2_offset</span><span class="p">)</span>
+  <span class="n">cluster_offset</span> <span class="o">=</span> <span class="n">l2_table</span><span class="p">[</span><span class="n">l2_index</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">offset_mask</span>
+  <span class="k">return</span> <span class="n">cluster_offset</span> <span class="o">+</span> <span class="n">byte_offset</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="consistency-checking">
+<h2>Consistency checking<a class="headerlink" href="#consistency-checking" title="Link to this heading"></a></h2>
+<p>This section is informational and included to provide background on the use
+of the <code class="docutils literal notranslate"><span class="pre">QED_F_NEED_CHECK</span> <span class="pre">features</span></code> bit.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">QED_F_NEED_CHECK</span></code> bit is used to mark an image as dirty before starting
+an operation that could leave the image in an inconsistent state if interrupted
+by a crash or power failure.  A dirty image must be checked on open because its
+metadata may not be consistent.</p>
+<p>Consistency check includes the following invariants:</p>
+<ul class="simple">
+<li><p>Each cluster is referenced once and only once. It is an inconsistency to have
+a cluster referenced more than once by L1 or L2 tables. A cluster has been leaked
+if it has no references.</p></li>
+<li><p>Offsets must be within the image file size and must be <code class="docutils literal notranslate"><span class="pre">cluster_size</span></code> aligned.</p></li>
+<li><p>Table offsets must at least <code class="docutils literal notranslate"><span class="pre">table_size</span></code> * <code class="docutils literal notranslate"><span class="pre">cluster_size</span></code> bytes from the end
+of the image file so that there is space for the entire table.</p></li>
+</ul>
+<p>The consistency check process starts from <code class="docutils literal notranslate"><span class="pre">l1_table_offset</span></code> and scans all L2 tables.
+After the check completes with no other errors besides leaks, the <code class="docutils literal notranslate"><span class="pre">QED_F_NEED_CHECK</span></code>
+bit can be cleared and the image can be accessed.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qcow2.html" class="btn btn-neutral float-left" title="Qcow2 Image File Format" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pr-helper.html" class="btn btn-neutral float-right" title="Persistent reservation helper protocol" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, The QEMU Project Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+
+<!-- Empty para to force a blank line after "Built with Sphinx ..." -->
+<p></p>
+
+<p>This documentation is for QEMU version 11.0.50.</p>
+
+
+<p><a href="../about/license.html">QEMU and this manual are released under the
+GNU General Public License, version 2.</a></p>
+
+ 
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

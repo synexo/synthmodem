@@ -1,0 +1,33 @@
+ATZ : resets modem to defaults
+ATX0: Disables dial tone detection and busy signal detection. The modem 
+AT&Q0 = Disable V.42 (error correction)
+
+AT+MS=B103,0,300,300: Force Bell 103, 300bps (V.8 automode off)
+AT+MS=V21,0,300,300: Force V21, 300bps (V.8 automode off)
+AT+MS=V22,0,1200,1200: Force V22, 1200bps (V.8 automode off)
+AT+MS=V22B,0,2400,2400: Force V22bis, 2400bps (V.8 automode off)
+AT+MS=V32B,0,14400,14400 = Force v32bis, 14400 (V.8 automode off)
+AT+MS=V32B,1,4800,9600 -> V.8 automode on
+AT+MS=V34,1,300,33600
+
+Windows run w/ debug and force protocol from command line example:
+$env:V32_DEBUG="1";node .\src\index.js --force-proto V22 2> server-debug.log
+
+What can you get out of it diagnostically? Many modern modems support:
+
+ATW2 or similar verbose connect messages showing which protocol actually negotiated
+AT#UD or vendor-specific "last call stats" showing why training failed
+Speaker enable (ATM2) so you can hear what the modem hears.
+ATI6 / ATI7 / ATI10 / ATI11 — these are all vendor-specific "extended info" commands.
+AT-K1 or AT-SR=1 — enables "trace mode" on some Rockwell/Conexant modems
+AT&V — dumps current S-register values and config
+ATW3 (if supported) — verbose connect message showing training phases
+Speaker on: ATM2L3 — highest speaker volume, stays on throughout call.
+
+ATW2              (verbose connect reporting)
+ATM2L3            (speaker on full, all phases)
+AT&V              (dump current config — save this output)
+AT-K1             (trace mode, if supported)
+AT#UD             (last call diagnostic — we have this one now)
+ATI6              (try this — might have the most readable info)
+ATI11             (same)

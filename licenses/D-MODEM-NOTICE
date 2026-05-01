@@ -1,0 +1,54 @@
+D-Modem
+=======
+
+D-Modem is a software SIP modem developed by Aon plc's cyber labs,
+published at https://github.com/synexo/D-Modem (the synexo fork that
+tracks PJSIP 2.15).
+
+synthmodem vendors one file from D-Modem, `d-modem.c`, at
+`vm/d-modem/d-modem.c`. This file is a PJSIP `pjmedia_port` subclass
+that bridges a PJSIP audio call to slmodemd's socketpair; it is the
+integration layer the `slmodemd-pjsip` backend relies on.
+
+synthmodem does NOT vendor:
+
+  - D-Modem's bundled `pjproject-2.15.1/` subtree. We verified at
+    vendor time that this subtree is byte-identical to upstream
+    pjsip/pjproject at tag 2.15.1, so we vendor PJSIP directly from
+    the upstream source (see licenses/PJSIP-NOTICE).
+  - D-Modem's bundled `slmodemd/` subtree. synthmodem already vendors
+    slmodemd at `vm/slmodemd/` from an earlier pin of the same
+    upstream; that coverage is unchanged.
+
+Upstream project:  https://github.com/synexo/D-Modem
+Upstream branch:   pjsip2.15
+Pinned commit:     902c79aa36fa094c7513fa911b64f4fa8a0bf614
+
+License
+-------
+
+`d-modem.c` carries:
+
+    Copyright (C) 2021 Aon plc
+
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License as
+    published by the Free Software Foundation; either version 2 of
+    the License, or (at your option) any later version.
+
+The full GPL-2.0 text that applies is `licenses/GPL-2.0.txt`. The
+copyright header in the vendored file is preserved verbatim.
+
+Corresponding source
+--------------------
+
+`d-modem.c` is itself the source for the compiled `d-modem` helper
+in `vm/prebuilt/`. No additional corresponding-source fetch is
+required for this component.
+
+Modifications from upstream
+---------------------------
+
+None at vendor time. If synthmodem ever modifies `d-modem.c`, this
+notice must be updated to record the nature of the modifications and
+attribute them to the synthmodem contributors, per GPL-2.0 §2(a).

@@ -1,0 +1,312 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XBZRLE (Xor Based Zero Run Length Encoding) &mdash; QEMU  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=f5127f15" />
+      <link rel="stylesheet" type="text/css" href="../../_static/theme_overrides.css?v=b3ae9cc8" />
+
+  
+    <link rel="shortcut icon" href="../../_static/qemu_32x32.png"/>
+      <script src="../../_static/jquery.js?v=8dae8fb0"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=3b5cce75"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/custom.js?v=2ab9f71d"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Backwards compatibility" href="compatibility.html" />
+    <link rel="prev" title="QATzip Compression" href="qatzip-compression.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #802400" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QEMU
+              <img src="../../_static/qemu_128x128.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../about/index.html">About QEMU</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../system/index.html">System Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/index.html">User Mode Emulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tools/index.html">Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../interop/index.html">System Emulation Management and Interoperability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../specs/index.html">System Emulation Guest Hardware Specifications</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Developer Information</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../index-process.html">QEMU Community Processes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index-build.html">QEMU Build System</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing/index.html">Testing QEMU</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index-api.html">Internal QEMU APIs</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index-internals.html">Internal Subsystem Information</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../qom.html">The QEMU Object Model (QOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../atomics.html">Atomic operations in QEMU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rcu.html">Using RCU (Read-Copy-Update) for synchronization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../block-coroutine-wrapper.html">block-coroutine-wrapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../clocks.html">Modelling a clock tree in QEMU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ebpf_rss.html">eBPF RSS virtio-net support</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="index.html">Migration</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="main.html">Migration framework</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="features.html">Migration features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="compatibility.html">Backwards compatibility</a></li>
+<li class="toctree-l4"><a class="reference internal" href="best-practices.html">Best practices</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../multi-process.html">Multi-process QEMU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reset.html">Reset in QEMU: the Resettable interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../s390-cpu-topology.html">QAPI interface for S390 CPU topology</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../s390-dasd-ipl.html">Booting from real channel-attached devices on s390x</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tracing.html">Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../uefi-vars.html">UEFI variables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../vfio-iommufd.html">IOMMUFD BACKEND usage with VFIO</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../writing-monitor-commands.html">How to write monitor commands</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../virtio-backends.html">Writing VirtIO backends for QEMU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../crypto.html">Cryptography in QEMU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../multiple-iothreads.html">Using Multiple <code class="docutils literal notranslate"><span class="pre">IOThread</span></code>s</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../index-tcg.html">TCG Emulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../codebase.html">Codebase</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #802400" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QEMU</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Developer Information</a></li>
+          <li class="breadcrumb-item"><a href="../index-internals.html">Internal Subsystem Information</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Migration</a></li>
+          <li class="breadcrumb-item"><a href="features.html">Migration features</a></li>
+      <li class="breadcrumb-item active">XBZRLE (Xor Based Zero Run Length Encoding)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="https://gitlab.com/qemu-project/qemu/-/blob/master/docs/devel/migration/xbzrle.rst">View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="xbzrle-xor-based-zero-run-length-encoding">
+<h1>XBZRLE (Xor Based Zero Run Length Encoding)<a class="headerlink" href="#xbzrle-xor-based-zero-run-length-encoding" title="Link to this heading"></a></h1>
+<p>Using XBZRLE (Xor Based Zero Run Length Encoding) allows for the reduction
+of VM downtime and the total live-migration time of Virtual machines.
+It is particularly useful for virtual machines running memory write intensive
+workloads that are typical of large enterprise applications such as SAP ERP
+Systems, and generally speaking for any application that uses a sparse memory
+update pattern.</p>
+<p>Instead of sending the changed guest memory page this solution will send a
+compressed version of the updates, thus reducing the amount of data sent during
+live migration.
+In order to be able to calculate the update, the previous memory pages need to
+be stored on the source. Those pages are stored in a dedicated cache
+(hash table) and are accessed by their address.
+The larger the cache size the better the chances are that the page has already
+been stored in the cache.
+A small cache size will result in high cache miss rate.
+Cache size can be changed before and during migration.</p>
+<p>Format</p>
+<p>The compression format performs a XOR between the previous and current content
+of the page, where zero represents an unchanged value.
+The page data delta is represented by zero and non zero runs.
+A zero run is represented by its length (in bytes).
+A non zero run is represented by its length (in bytes) and the new data.
+The run length is encoded using ULEB128 (<a class="reference external" href="http://en.wikipedia.org/wiki/LEB128">http://en.wikipedia.org/wiki/LEB128</a>)</p>
+<p>There can be more than one valid encoding, the sender may send a longer
+encoding for the benefit of reducing computation cost.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">page</span> <span class="o">=</span> <span class="n">zrun</span> <span class="n">nzrun</span>
+       <span class="o">|</span> <span class="n">zrun</span> <span class="n">nzrun</span> <span class="n">page</span>
+
+<span class="n">zrun</span> <span class="o">=</span> <span class="n">length</span>
+
+<span class="n">nzrun</span> <span class="o">=</span> <span class="n">length</span> <span class="n">byte</span><span class="o">...</span>
+
+<span class="n">length</span> <span class="o">=</span> <span class="n">uleb128</span> <span class="n">encoded</span> <span class="n">integer</span>
+</pre></div>
+</div>
+<p>On the sender side XBZRLE is used as a compact delta encoding of page updates,
+retrieving the old page content from the cache (default size of 64MB). The
+receiving side uses the existing page’s content and XBZRLE to decode the new
+page’s content.</p>
+<p>This work was originally based on research results published
+VEE 2011: Evaluation of Delta Compression Techniques for Efficient Live
+Migration of Large Virtual Machines by Benoit, Svard, Tordsson and Elmroth.
+Additionally the delta encoder XBRLE was improved further using the XBZRLE
+instead.</p>
+<p>XBZRLE has a sustained bandwidth of 2-2.5 GB/s for typical workloads making it
+ideal for in-line, real-time encoding such as is needed for live-migration.</p>
+<p>Example:</p>
+<p>old buffer:</p>
+<div class="highlight-batch notranslate"><div class="highlight"><pre><span></span>1001 zeros
+05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 68 00 00 6b 00 6d
+3074 zeros
+</pre></div>
+</div>
+<p>new buffer:</p>
+<div class="highlight-batch notranslate"><div class="highlight"><pre><span></span>1001 zeros
+01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 68 00 00 67 00 69
+3074 zeros
+</pre></div>
+</div>
+<p>encoded buffer:</p>
+<div class="highlight-batch notranslate"><div class="highlight"><pre><span></span>encoded length 24
+e9 07 0f 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 03 01 67 01 01 69
+</pre></div>
+</div>
+<section id="cache-update-strategy">
+<h2>Cache update strategy<a class="headerlink" href="#cache-update-strategy" title="Link to this heading"></a></h2>
+<p>Keeping the hot pages in the cache is effective for decreasing cache
+misses. XBZRLE uses a counter as the age of each page. The counter will
+increase after each ram dirty bitmap sync. When a cache conflict is
+detected, XBZRLE will only evict pages in the cache that are older than
+a threshold.</p>
+</section>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
+<ol class="arabic">
+<li><p>Verify the destination QEMU version is able to decode the new format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">qemu</span><span class="p">)</span> <span class="n">info</span> <span class="n">migrate_capabilities</span>
+<span class="n">xbzrle</span><span class="p">:</span> <span class="n">off</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+</li>
+<li><p>Activate xbzrle on both source and destination:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">qemu</span><span class="p">)</span> <span class="n">migrate_set_capability</span> <span class="n">xbzrle</span> <span class="n">on</span>
+</pre></div>
+</div>
+</li>
+<li><p>Set the XBZRLE cache size - the cache size is in MBytes and should be a
+power of 2. The cache default value is 64 MBytes (on source only):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">qemu</span><span class="p">)</span> <span class="n">migrate_set_parameter</span> <span class="n">xbzrle</span><span class="o">-</span><span class="n">cache</span><span class="o">-</span><span class="n">size</span> <span class="mi">256</span><span class="n">m</span>
+</pre></div>
+</div>
+</li>
+<li><p>Start outgoing migration:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">qemu</span><span class="p">)</span> <span class="n">migrate</span> <span class="o">-</span><span class="n">d</span> <span class="n">tcp</span><span class="p">:</span><span class="n">destination</span><span class="o">.</span><span class="n">host</span><span class="p">:</span><span class="mi">4444</span>
+<span class="p">(</span><span class="n">qemu</span><span class="p">)</span> <span class="n">info</span> <span class="n">migrate</span>
+<span class="n">capabilities</span><span class="p">:</span> <span class="n">xbzrle</span><span class="p">:</span> <span class="n">on</span>
+<span class="n">Migration</span> <span class="n">status</span><span class="p">:</span> <span class="n">active</span>
+<span class="n">transferred</span> <span class="n">ram</span><span class="p">:</span> <span class="n">A</span> <span class="n">kbytes</span>
+<span class="n">remaining</span> <span class="n">ram</span><span class="p">:</span> <span class="n">B</span> <span class="n">kbytes</span>
+<span class="n">total</span> <span class="n">ram</span><span class="p">:</span> <span class="n">C</span> <span class="n">kbytes</span>
+<span class="n">total</span> <span class="n">time</span><span class="p">:</span> <span class="n">D</span> <span class="n">milliseconds</span>
+<span class="n">duplicate</span><span class="p">:</span> <span class="n">E</span> <span class="n">pages</span>
+<span class="n">normal</span><span class="p">:</span> <span class="n">F</span> <span class="n">pages</span>
+<span class="n">normal</span> <span class="nb">bytes</span><span class="p">:</span> <span class="n">G</span> <span class="n">kbytes</span>
+<span class="n">cache</span> <span class="n">size</span><span class="p">:</span> <span class="n">H</span> <span class="nb">bytes</span>
+<span class="n">xbzrle</span> <span class="n">transferred</span><span class="p">:</span> <span class="n">I</span> <span class="n">kbytes</span>
+<span class="n">xbzrle</span> <span class="n">pages</span><span class="p">:</span> <span class="n">J</span> <span class="n">pages</span>
+<span class="n">xbzrle</span> <span class="n">cache</span> <span class="n">miss</span><span class="p">:</span> <span class="n">K</span> <span class="n">pages</span>
+<span class="n">xbzrle</span> <span class="n">cache</span> <span class="n">miss</span> <span class="n">rate</span><span class="p">:</span> <span class="n">L</span>
+<span class="n">xbzrle</span> <span class="n">encoding</span> <span class="n">rate</span><span class="p">:</span> <span class="n">M</span>
+<span class="n">xbzrle</span> <span class="n">overflow</span><span class="p">:</span> <span class="n">N</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>xbzrle cache miss: the number of cache misses to date - high cache-miss rate
+indicates that the cache size is set too low.</p>
+<p>xbzrle overflow: the number of overflows in the decoding which where the delta
+could not be compressed. This can happen if the changes in the pages are too
+large or there are many short changes; for example, changing every second byte
+(half a page).</p>
+<p>Testing: Testing indicated that live migration with XBZRLE was completed in 110
+seconds, whereas without it would not be able to complete.</p>
+<p>A simple synthetic memory r/w load generator:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdlib.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">calloc</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span><span class="w"> </span><span class="mi">4096</span><span class="p">);</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">4096</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">buf</span><span class="p">[</span><span class="n">i</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4096</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;.&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qatzip-compression.html" class="btn btn-neutral float-left" title="QATzip Compression" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="compatibility.html" class="btn btn-neutral float-right" title="Backwards compatibility" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, The QEMU Project Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+
+<!-- Empty para to force a blank line after "Built with Sphinx ..." -->
+<p></p>
+
+<p>This documentation is for QEMU version 11.0.50.</p>
+
+
+<p><a href="../../about/license.html">QEMU and this manual are released under the
+GNU General Public License, version 2.</a></p>
+
+ 
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
