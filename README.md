@@ -1,6 +1,6 @@
 # synthmodem
 
-A software modem-to-telnet gateway. Accepts SIP calls from a SIP
+A modem-to-telnet gateway. Accepts SIP calls from a SIP
 gateway, negotiates a real modem handshake in software, and bridges
 the resulting data-mode stream to a telnet host. Lets a real modem
 on a phone line dial into a modern BBS over SIP.
