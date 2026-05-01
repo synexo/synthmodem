@@ -188,7 +188,7 @@ the addon didn't load. Possible causes, in order of likelihood:
 3. The build attempted but failed (missing C++ workload, mismatched
    Python). Re-run `npm install` after fixing and watch the log.
 
-The app will run regardless, but on a real PSTN call you'll see the
+The app will run regardless, but on a real call you'll see the
 garbage-character symptom described above. Don't ignore the warning.
 
 ## Configure
@@ -233,7 +233,7 @@ guidance:
 - **Pick `slmodemd-pjsip` if** you only need V.21–V.34 from
   V.8-capable callers and never need to handle vintage non-V.8
   modems (V.22-only, Bell 103, etc.). Fewer moving parts than
-  `auto`. Stable and end-to-end tested over real PSTN.
+  `auto`. Stable and end-to-end tested.
 - **Pick `native` if** you only need V.21, V.22, V.22bis, V.23, or
   Bell 103 and you can't run QEMU on the host (or you specifically
   want to stay in-process). Faster path to running, no VM, but no
