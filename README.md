@@ -1,17 +1,17 @@
 # synthmodem
 
-A software modem-to-telnet gateway. Accepts SIP calls from a PSTN
+A software modem-to-telnet gateway. Accepts SIP calls from a SIP
 gateway, negotiates a real modem handshake in software, and bridges
 the resulting data-mode stream to a telnet host. Lets a real modem
 on a phone line dial into a modern BBS over SIP.
 
 ```
    Real Modem            SIP Gateway            synthmodem            Telnet Host
-   on PSTN line  ────►   (e.g. SPA2102) ────►   (this app)    ────►   (TCP/IP BBS)
+   on RJ11 line  ────►   (e.g. SPA2102) ────►   (this app)    ────►   (TCP/IP BBS)
    (V.21..V.34)          SIP/RTP/PCMU
 ```
 
-End-to-end verified at V.34 33600 bps over real PSTN, plus the
+End-to-end verified at V.34 33600 bps, plus the
 classic low-end protocols (V.21, V.22, V.22bis, Bell 103) for
 period-correct dial-in to vintage software.
 
@@ -364,7 +364,7 @@ does and what side-effects to expect.
   hardcoded in vintage terminal software.
 - **`slmodemd-pjsip` backend** — Stable. V.21 through V.34 via
   slmodemd's DSP inside a QEMU VM, paced by D-Modem's PJSIP
-  integration. End-to-end tested over real PSTN.
+  integration. End-to-end tested.
 - **`native` backend** — Pure JavaScript, in-process. All five
   low-speed protocols are validated end-to-end against real hardware
   modems over SIP/RTP: **V.21**, **V.22** (1200 bps), **V.22bis**
